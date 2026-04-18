@@ -61,11 +61,18 @@ elif [ -e "$ASSET_DIR/geosite-custom.dat" ]; then
     cp -p "$ASSET_DIR/geosite-custom.dat" "$tmp/geosite-custom.dat"
 fi
 
-# Validate: point xray at tmp as asset dir and run -test
+# Validate: point xray at tmp as asset dir and run -test.
+# On a fresh bootstrap config.d may still be empty; xray -test has
+# nothing to load and would either error or hang. Skip gracefully —
+# update-managed-stack.sh runs its own xray -test after rendering.
 log 'validating with xray -test'
-XRAY_LOCATION_ASSET="$tmp" "$XRAY_BIN" -test -confdir "$CONF_DIR" \
-    > "$tmp/test.log" 2>&1 \
-    || { cat "$tmp/test.log" >&2; die 'xray -test failed with new assets'; }
+if ls "$CONF_DIR"/*.json >/dev/null 2>&1; then
+    XRAY_LOCATION_ASSET="$tmp" "$XRAY_BIN" -test -confdir "$CONF_DIR" \
+        > "$tmp/test.log" 2>&1 \
+        || { cat "$tmp/test.log" >&2; die 'xray -test failed with new assets'; }
+else
+    log 'config.d is empty (first-run); skipping xray -test'
+fi
 
 # Atomic replace: backup current, install new
 ts=$(date +%Y%m%d-%H%M%S)

@@ -50,7 +50,7 @@
       {
         "type": "field",
         "inboundTag": ["c-def-in"],
-        "domain": ["geosite:geolocation-ru"],
+        "domain": ["geosite:category-ru"],
         "outboundTag": "D"
       },
 
