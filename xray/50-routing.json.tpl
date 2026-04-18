@@ -305,7 +305,7 @@
       {
         "type": "field",
         "inboundTag": ["c-def-in"],
-        "outboundTag": "D"
+        "outboundTag": "T"
       }
     ]
   }
