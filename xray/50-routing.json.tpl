@@ -215,12 +215,6 @@
         "domain": ["geosite:telegram"],
         "outboundTag": "T"
       },
-      {
-        "type": "field",
-        "inboundTag": ["c-def-in"],
-        "ip": ["geoip:telegram"],
-        "outboundTag": "T"
-      },
 
       {
         "type": "field",
