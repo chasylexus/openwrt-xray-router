@@ -158,7 +158,7 @@
           "domain:weaviate.io",
           "domain:qdrant.tech"
         ],
-        "outboundTag": "A"
+        "outboundTag": "T"
       },
       {
         "type": "field",
@@ -206,7 +206,7 @@
           "domain:ahrefs.com",
           "domain:baginya.org"
         ],
-        "outboundTag": "A"
+        "outboundTag": "T"
       },
 
       {

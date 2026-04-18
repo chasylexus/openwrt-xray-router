@@ -22,3 +22,9 @@ codeload.github.com
 telegram.org
 t.me
 api.telegram.org
+
+# OpenWrt updates (packages, sysupgrade images) — downloads.openwrt.org
+# can be flaky / throttled on some RU ISPs; push it through T to stay
+# reliable for apk/opkg and firmware fetches.
+downloads.openwrt.org
+openwrt.org
