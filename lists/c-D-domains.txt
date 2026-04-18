@@ -1,10 +1,23 @@
 # c-D-domains.txt
 # Domains to force-direct for LAN clients. update-sets.sh resolves each and
 # adds the IPs to c_D_v4 (nft `return` path).
+# Also: c-D-in inbound in Xray routes these to outbound D.
 
 # Apple
 apple.com
 www.apple.com
 icloud.com
 www.icloud.com
+icloud-content.com
+apple-cloudkit.com
 mzstatic.com
+captive.apple.com
+
+# Captive-portal / connectivity checks (must NOT go through proxy)
+connectivitycheck.gstatic.com
+detectportal.firefox.com
+msftconnecttest.com
+nmcheck.gnome.org
+
+# Personal direct override
+kvk.com

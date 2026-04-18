@@ -1,11 +1,151 @@
 # c-A-domains.txt
 # Domains to force through A for LAN clients.
+# A = non-RU exit: AI services + Western services that block Russian IPs.
 
-# Gemini (kept specific; avoids matching all of google.com)
+# --- OpenAI ---
+openai.com
+chatgpt.com
+oaistatic.com
+oaiusercontent.com
+sora.com
+
+# --- Anthropic / Claude ---
+anthropic.com
+claude.ai
+claude.com
+claudeusercontent.com
+
+# --- Google AI (gemini/bard/aistudio/notebooklm/deepmind) ---
 gemini.google.com
+bard.google.com
 aistudio.google.com
 generativelanguage.googleapis.com
+deepmind.com
+deepmind.google
+notebooklm.google.com
+notebooklm.google
+ai.google.dev
+generativeai.google
+makersuite.google.com
+labs.google
+jules.google
+jules.google.com
+clients6.google.com
+apis.google.com
+colab.research.google.com
+geller-pa.googleapis.com
+aida.googleapis.com
+aisandbox-pa.googleapis.com
+proactivebackend-pa.googleapis.com
+robinfrontend-pa.googleapis.com
+antigravity-pa.googleapis.com
+antigravity.googleapis.com
+antigravity.google
+stitch.withgoogle.com
+firebaseinstallations.googleapis.com
+speechs3proto2-pa.googleapis.com
 
-# Netflix
+# --- xAI / Grok ---
+grok.com
+x.ai
+
+# --- Microsoft AI (Copilot) ---
+copilot.microsoft.com
+
+# --- Other AI ---
+perplexity.ai
+mistral.ai
+cohere.ai
+cohere.com
+huggingface.co
+together.ai
+groq.com
+replicate.com
+openrouter.ai
+fireworks.ai
+cerebras.ai
+poe.com
+assemblyai.com
+lightning.ai
+monica.im
+dify.ai
+
+# --- AI Code / Design ---
+cursor.com
+cursor.sh
+v0.dev
+lovable.dev
+replit.com
+bolt.new
+
+# --- AI Media ---
+midjourney.com
+runway.ml
+runwayml.com
+elevenlabs.io
+stability.ai
+
+# --- AI Infra ---
+langchain.com
+pinecone.io
+weaviate.io
+qdrant.tech
+
+# --- Streaming (non-RU, geo-blocked for RU IPs) ---
 netflix.com
 www.netflix.com
+nflxvideo.net
+nflxso.net
+nflxext.net
+nflximg.net
+spotify.com
+scdn.co
+
+# --- Shopping (non-RU) ---
+walmart.com
+ikea.com.tr
+onfastspring.com
+paytr.com
+
+# --- Finance ---
+stripe.com
+blockchain.com
+
+# --- Monitoring / Observability ---
+sentry.io
+datadoghq.com
+browser-intake-datadoghq.com
+branch.io
+stytch.com
+
+# --- Dev tools often geo-blocked ---
+jetbrains.com
+stackoverflow.com
+stackexchange.com
+clickhouse.com
+notion.so
+canva.com
+tableau.com
+flourish.studio
+zapier.com
+zapier-deployment.com
+setapp.com
+softorino.com
+meetingbar.app
+radarr.video
+jakeroid.com
+technoplaza.net
+
+# --- Misc (non-RU services) ---
+tuxera.com
+paragon-software.com
+hey.com
+quora.com
+coursera.org
+patreon.com
+fbi.gov
+edgeuno.com
+electronic.us
+cdnst.net
+ahrefs.com
+baginya.org

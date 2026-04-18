@@ -1,12 +1,10 @@
 # r-A-domains.txt
 # Domains that should be routed from the ROUTER ITSELF via A.
 # update-sets.sh resolves each via nslookup and adds IPv4 to r_A_v4.
+#
+# Keep this list LEAN — router rarely needs an A-exit (mostly if you hit
+# an AI API from diagnostic scripts). Put only what you actually curl
+# from the router shell.
 
-# Gemini
-gemini.google.com
-aistudio.google.com
-generativelanguage.googleapis.com
-
-# Netflix
-netflix.com
-www.netflix.com
+# Example: if you pull something from an AI API from the router, add here.
+# generativelanguage.googleapis.com

@@ -1,17 +1,155 @@
 # c-T-domains.txt
 # Domains to force through T for LAN clients.
+# T = main RKN-bypass exit.
+#
+# NOTE on Google: gemini/aistudio/notebooklm and other AI-specific
+# subdomains are in c-A-domains.txt. Their resolved IPs may overlap with
+# general google.com edge IPs — that is why the nft layer evaluates
+# c_A_v4 BEFORE c_T_v4. Domain-level disambiguation for the fallback
+# c-def-in inbound happens in xray/50-routing.json.tpl.
 
-# Google (NOTE: gemini.google.com is listed in c-A-domains.txt; its resolved
-# IPs may overlap with google.com. The xray routing layer handles domain-level
-# specificity via c-def-in when DNS sniffing is available.)
+# --- Google (search, mail, drive, docs, play, youtube) ---
 google.com
 www.google.com
+mail.google.com
+drive.google.com
+docs.google.com
+photos.google.com
+play.google.com
+googleapis.com
+googleusercontent.com
+ggpht.com
+gstatic.com
+
+# --- YouTube ---
 youtube.com
 www.youtube.com
 youtu.be
+ytimg.com
+googlevideo.com
 
-# Telegram
+# --- Telegram (domains; IP DC ranges in c-T-ipv4.txt) ---
 telegram.org
 t.me
 web.telegram.org
 telegra.ph
+
+# --- Meta (Facebook, Instagram, WhatsApp) ---
+facebook.com
+fb.com
+fbcdn.net
+fbsbx.com
+instagram.com
+cdninstagram.com
+whatsapp.com
+whatsapp.net
+
+# --- Twitter / X ---
+twitter.com
+x.com
+twimg.com
+t.co
+
+# --- TikTok ---
+tiktok.com
+tiktokcdn.com
+
+# --- Discord ---
+discord.com
+discord.gg
+discordapp.com
+discord.media
+
+# --- LinkedIn ---
+linkedin.com
+licdn.com
+
+# --- Microsoft ecosystem (blocked/throttled in RU: office, onedrive, outlook, bing) ---
+microsoft.com
+office.com
+office365.com
+live.com
+outlook.com
+onedrive.com
+sharepoint.com
+bing.com
+msn.com
+
+# --- Wikipedia ---
+wikipedia.org
+wikimedia.org
+
+# --- RU-blocked media ---
+habr.com
+habrastorage.org
+meduza.io
+holod.media
+svtv.org
+wonderzine.com
+rucriminal.info
+bogmedia.org
+rtfm.co.ua
+4pda.to
+4pda.ws
+mywishlist.ru
+
+# --- RU-blocked torrents / sci ---
+rutracker.org
+nnmclub.to
+libgen.li
+library.lol
+sci-hub.ru
+sci-hub.se
+
+# --- RU-blocked streaming ---
+hdrezka.ac
+rezka.ag
+voidboost.cc
+filmix.ac
+kino.pub
+kinopub.online
+kinogo.biz
+ottclub.tv
+
+# --- International news blocked in RU ---
+bbc.com
+cnn.com
+dailymail.co.uk
+cosmopolitan.com
+evonomics.com
+flipboard.com
+medium.com
+penguinrandomhouse.com
+wtfhappenedin1971.com
+
+# --- VPN / privacy services blocked in RU ---
+proton.me
+protonmail.com
+amnezia.org
+tunnelbear.com
+redshieldvpn.com
+
+# --- Speedtest ---
+speedtest.net
+ooklaserver.net
+
+# --- Streaming (non-RU, peacock/playstation) ---
+peacocktv.com
+playstation.com
+
+# --- IP lookup ---
+2ip.io
+2ip.ru
+whatismyipaddress.com
+whatismyipaddress.info
+
+# --- Adult (blocked in RU) ---
+pornhub.com
+xhamster.com
+xnxx.com
+xvideos.com
+redgifs.com
+fap-guru.cc
+
+# --- Gambling ---
+1xbet.com

@@ -2,13 +2,23 @@
 # Domains that should be routed from the ROUTER ITSELF via T.
 # update-sets.sh resolves each via nslookup and adds IPv4 to r_T_v4.
 # One per line. # starts a comment.
+#
+# Keep this list LEAN — the router only needs outbound connectivity for
+# update scripts, time sync, alerts, and curl-based diagnostics. Piling
+# client-side domains here is pointless (router does not open Gmail).
 
-# Google
+# Google (for diagnostics / connectivity checks)
 google.com
 www.google.com
 
-# Telegram
+# GitHub (for update-managed-stack.sh / update-assets.sh if provider
+# blocks github raw)
+github.com
+raw.githubusercontent.com
+objects.githubusercontent.com
+codeload.github.com
+
+# Telegram (if you use it for router notifications)
 telegram.org
 t.me
-web.telegram.org
-telegra.ph
+api.telegram.org
