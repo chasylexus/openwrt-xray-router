@@ -4,6 +4,7 @@
     "domainMatcher": "hybrid",
     "rules": [
       {
+        "_comment": "=== ROUTER-SIDE (nat/output) — explicit per-inbound binding ===",
         "type": "field",
         "inboundTag": ["r-T-in"],
         "outboundTag": "T"
@@ -13,70 +14,30 @@
         "inboundTag": ["r-A-in"],
         "outboundTag": "A"
       },
+
       {
+        "_comment": "=== CLIENT-SIDE (c-def-in) — priority from most to least specific ===",
+        "_comment_1": "1. defense-in-depth: LAN/private never leaves via proxy",
         "type": "field",
-        "inboundTag": ["c-D-in"],
+        "inboundTag": ["c-def-in"],
+        "ip": ["geoip:private"],
         "outboundTag": "D"
-      },
-      {
-        "type": "field",
-        "inboundTag": ["c-T-in"],
-        "outboundTag": "T"
-      },
-      {
-        "type": "field",
-        "inboundTag": ["c-A-in"],
-        "outboundTag": "A"
       },
 
       {
+        "_comment": "2. ads (optional — reject before they can go anywhere)",
         "type": "field",
         "inboundTag": ["c-def-in"],
         "domain": ["geosite:category-ads-all"],
         "outboundTag": "B"
       },
-      {
-        "type": "field",
-        "inboundTag": ["c-def-in"],
-        "domain": ["geosite:private", "geosite:cn", "geosite:geolocation-cn"],
-        "outboundTag": "D"
-      },
-      {
-        "type": "field",
-        "inboundTag": ["c-def-in"],
-        "ip": ["geoip:private", "geoip:cn"],
-        "outboundTag": "D"
-      },
-      {
-        "type": "field",
-        "inboundTag": ["c-def-in"],
-        "domain": ["geosite:category-ru"],
-        "outboundTag": "D"
-      },
 
       {
+        "_comment": "3a. Google AI -> A (itdoginfo GOOGLE-AI tag + explicit domains for coverage)",
         "type": "field",
         "inboundTag": ["c-def-in"],
         "domain": [
-          "geosite:apple",
-          "domain:icloud.com",
-          "domain:icloud-content.com",
-          "domain:apple-cloudkit.com",
-          "domain:mzstatic.com",
-          "full:captive.apple.com",
-          "full:connectivitycheck.gstatic.com",
-          "full:detectportal.firefox.com",
-          "full:msftconnecttest.com",
-          "full:nmcheck.gnome.org",
-          "domain:kvk.com"
-        ],
-        "outboundTag": "D"
-      },
-
-      {
-        "type": "field",
-        "inboundTag": ["c-def-in"],
-        "domain": [
+          "ext:geosite-custom.dat:GOOGLE-AI",
           "domain:gemini.google.com",
           "domain:bard.google.com",
           "domain:aistudio.google.com",
@@ -90,8 +51,10 @@
           "domain:generativeai.google",
           "domain:labs.google",
           "domain:jules.google",
+          "domain:antigravity.google",
           "full:apis.google.com",
           "full:clients6.google.com",
+          "full:play.google.com",
           "full:colab.research.google.com",
           "full:geller-pa.googleapis.com",
           "full:aida.googleapis.com",
@@ -100,41 +63,60 @@
           "full:robinfrontend-pa.googleapis.com",
           "full:antigravity-pa.googleapis.com",
           "full:antigravity.googleapis.com",
-          "domain:antigravity.google",
           "full:stitch.withgoogle.com",
           "full:firebaseinstallations.googleapis.com",
           "full:speechs3proto2-pa.googleapis.com"
         ],
         "outboundTag": "A"
       },
+
       {
+        "_comment": "3b. streaming (Netflix / Peacock / Prime Video) -> A",
         "type": "field",
         "inboundTag": ["c-def-in"],
         "domain": [
           "geosite:netflix",
-          "geosite:amazon",
           "domain:primevideo.com",
-          "domain:peacocktv.com",
-          "domain:paramountplus.com"
+          "domain:peacocktv.com"
         ],
         "outboundTag": "A"
       },
+
       {
+        "_comment": "4a. OpenAI / ChatGPT -> T",
         "type": "field",
         "inboundTag": ["c-def-in"],
         "domain": [
           "geosite:openai",
-          "geosite:anthropic",
-          "geosite:category-ai-!cn",
           "domain:openai.com",
           "domain:chatgpt.com",
           "domain:oaistatic.com",
           "domain:oaiusercontent.com",
-          "domain:sora.com",
+          "domain:sora.com"
+        ],
+        "outboundTag": "T"
+      },
+
+      {
+        "_comment": "4b. Anthropic / Claude -> T",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "domain": [
+          "geosite:anthropic",
           "domain:anthropic.com",
           "domain:claude.ai",
           "domain:claude.com",
-          "domain:claudeusercontent.com",
+          "domain:claudeusercontent.com"
+        ],
+        "outboundTag": "T"
+      },
+
+      {
+        "_comment": "4c. xAI / Grok / Microsoft Copilot / other AI -> T",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "domain": [
+          "geosite:category-ai-!cn",
           "domain:grok.com",
           "domain:x.ai",
           "full:copilot.microsoft.com",
@@ -153,7 +135,16 @@
           "domain:assemblyai.com",
           "domain:lightning.ai",
           "domain:monica.im",
-          "domain:dify.ai",
+          "domain:dify.ai"
+        ],
+        "outboundTag": "T"
+      },
+
+      {
+        "_comment": "4d. AI Code / Design / Media / Infra -> T",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "domain": [
           "domain:cursor.com",
           "domain:cursor.sh",
           "domain:v0.dev",
@@ -172,84 +163,36 @@
         ],
         "outboundTag": "T"
       },
-      {
-        "type": "field",
-        "inboundTag": ["c-def-in"],
-        "domain": [
-          "geosite:spotify",
-          "domain:walmart.com",
-          "domain:ikea.com.tr",
-          "domain:onfastspring.com",
-          "domain:paytr.com",
-          "domain:stripe.com",
-          "domain:blockchain.com",
-          "domain:sentry.io",
-          "domain:datadoghq.com",
-          "domain:branch.io",
-          "domain:stytch.com",
-          "domain:jetbrains.com",
-          "domain:stackoverflow.com",
-          "domain:stackexchange.com",
-          "domain:clickhouse.com",
-          "domain:notion.so",
-          "domain:canva.com",
-          "domain:tableau.com",
-          "domain:flourish.studio",
-          "domain:zapier.com",
-          "domain:zapier-deployment.com",
-          "domain:setapp.com",
-          "domain:softorino.com",
-          "domain:meetingbar.app",
-          "domain:radarr.video",
-          "domain:jakeroid.com",
-          "domain:technoplaza.net",
-          "domain:tuxera.com",
-          "domain:paragon-software.com",
-          "domain:hey.com",
-          "domain:quora.com",
-          "domain:coursera.org",
-          "domain:patreon.com",
-          "domain:fbi.gov",
-          "domain:edgeuno.com",
-          "domain:electronic.us",
-          "domain:cdnst.net",
-          "domain:ahrefs.com",
-          "domain:baginya.org"
-        ],
-        "outboundTag": "T"
-      },
 
       {
-        "type": "field",
-        "inboundTag": ["c-def-in"],
-        "domain": ["geosite:telegram"],
-        "outboundTag": "T"
-      },
-
-      {
+        "_comment": "5. Big social / media / search via geosite -> T",
         "type": "field",
         "inboundTag": ["c-def-in"],
         "domain": [
           "geosite:youtube",
-          "geosite:google",
+          "geosite:spotify",
           "geosite:facebook",
           "geosite:instagram",
           "geosite:twitter",
+          "geosite:telegram",
           "geosite:tiktok",
           "geosite:discord",
           "geosite:linkedin",
           "geosite:microsoft",
+          "geosite:google",
           "geosite:wikimedia",
           "geosite:bbc",
-          "geosite:cnn",
-          "geosite:category-porn"
+          "geosite:cnn"
         ],
         "outboundTag": "T"
       },
+
       {
+        "_comment": "6. RU blocked — media / torrents / sci / streaming / news -> T (itdoginfo HDREZKA tag + explicit domains/keywords)",
         "type": "field",
         "inboundTag": ["c-def-in"],
         "domain": [
+          "ext:geosite-custom.dat:HDREZKA",
           "keyword:rutracker",
           "keyword:nnmclub",
           "keyword:nnm-club",
@@ -280,6 +223,8 @@
           "domain:kinopub.online",
           "domain:kinogo.biz",
           "domain:ottclub.tv",
+          "domain:speedtest.net",
+          "domain:ooklaserver.net",
           "domain:dailymail.co.uk",
           "domain:cosmopolitan.com",
           "domain:evonomics.com",
@@ -287,9 +232,9 @@
           "domain:medium.com",
           "domain:penguinrandomhouse.com",
           "domain:wtfhappenedin1971.com",
+          "domain:amnezia.org",
           "domain:proton.me",
           "domain:protonmail.com",
-          "domain:amnezia.org",
           "domain:tunnelbear.com",
           "domain:redshieldvpn.com",
           "domain:playstation.com",
@@ -303,6 +248,55 @@
       },
 
       {
+        "_comment": "7. Dev tools / shopping / finance / monitoring / misc -> T",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "domain": [
+          "domain:jetbrains.com",
+          "domain:stackoverflow.com",
+          "domain:stackexchange.com",
+          "domain:clickhouse.com",
+          "domain:notion.so",
+          "domain:canva.com",
+          "domain:tableau.com",
+          "domain:flourish.studio",
+          "domain:zapier.com",
+          "domain:zapier-deployment.com",
+          "domain:setapp.com",
+          "domain:softorino.com",
+          "domain:meetingbar.app",
+          "domain:radarr.video",
+          "domain:jakeroid.com",
+          "domain:technoplaza.net",
+          "domain:tuxera.com",
+          "domain:paragon-software.com",
+          "domain:sentry.io",
+          "domain:datadoghq.com",
+          "domain:browser-intake-datadoghq.com",
+          "domain:branch.io",
+          "domain:stytch.com",
+          "domain:ikea.com.tr",
+          "domain:onfastspring.com",
+          "domain:paytr.com",
+          "domain:walmart.com",
+          "domain:blockchain.com",
+          "domain:stripe.com",
+          "domain:hey.com",
+          "domain:quora.com",
+          "domain:coursera.org",
+          "domain:patreon.com",
+          "domain:fbi.gov",
+          "domain:edgeuno.com",
+          "domain:electronic.us",
+          "domain:cdnst.net",
+          "domain:ahrefs.com",
+          "domain:baginya.org"
+        ],
+        "outboundTag": "T"
+      },
+
+      {
+        "_comment": "8. fallback: anything not matched above goes direct (home ISP)",
         "type": "field",
         "inboundTag": ["c-def-in"],
         "outboundTag": "D"
