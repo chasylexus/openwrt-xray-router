@@ -1,0 +1,20 @@
+# secrets never in git
+secret.env
+*.secret
+*.secret.env
+
+# editor junk
+*.swp
+*.swo
+.DS_Store
+
+# build/render artefacts (never rendered in the repo itself)
+*.rendered
+*.staged
+*.new.*
+
+# on-device dirs, if someone accidentally inits git on top
+state/
+templates/
+lists/merged/
+lists/remote/

@@ -1,0 +1,6 @@
+# r-A-domains.txt
+# Domains that should be routed from the ROUTER ITSELF via A.
+#
+# Examples:
+# api.anthropic.com
+# api.openai.com

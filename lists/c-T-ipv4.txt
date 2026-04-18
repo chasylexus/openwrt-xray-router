@@ -1,0 +1,6 @@
+# c-T-ipv4.txt
+# IPv4 addresses/CIDRs for CLIENT LAN traffic that should be routed via T.
+# These get nft `redirect to :10811` -> Xray c-T-in -> outbound T.
+#
+# Examples:
+# 104.21.0.0/16         # cloudflare range (illustrative only)

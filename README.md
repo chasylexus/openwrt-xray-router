@@ -1,0 +1,336 @@
+# openwrt-xray-router
+
+Production-grade setup for an OpenWrt router with dual-circuit policy routing via Xray:
+separate handling for the router itself (OUTPUT hook) and for LAN clients (PREROUTING hook),
+with fallback through Xray routing by domain / geosite / geoip.
+
+Designed for set-and-forget deployment: bootstrap → cron → atomic updates → rollback on any validation error.
+
+## Platform
+
+- OpenWrt 25.12.2 (r32802+), BusyBox ash v1.37+
+- Package manager: **apk** (not opkg)
+- Xray already installed as a binary at `/usr/local/xray/xray`
+- Xray assets (`geosite.dat`, `geoip.dat`) at `/usr/local/xray/`
+- dnsmasq-full with nftset support
+
+## Dependencies
+
+Required (checked by `bootstrap-xray-v2.sh`):
+- `ash`, `awk`, `sed`, `grep`, `sort`, `uniq`
+- `nft` (nftables)
+- `ip` (iproute2)
+- `nslookup`
+- `wget` **or** `curl` (one is enough)
+- `uci`
+- `procd` / `service`
+
+Intentionally **not** used: `jq`, `python`, `perl`, `opkg`.
+
+## Architecture overview
+
+### Two circuits
+
+**Circuit 1: the router itself (OUTPUT).**
+`nft table inet xray_router` holds sets `r_T_v4`, `r_A_v4`.
+If `daddr` matches a set — `redirect to :10801` (→ `r-T-in` → outbound T)
+or `:10802` (→ `r-A-in` → outbound A). Everything else goes direct (system path).
+
+**Circuit 2: LAN clients (PREROUTING on `br-lan`).**
+`nft table inet xray_clients` holds sets `c_D_v4`, `c_T_v4`, `c_A_v4`.
+- `c_D_v4` → `return` (direct, no Xray hop).
+- `c_T_v4` → `redirect to :10811` (→ `c-T-in` → outbound T).
+- `c_A_v4` → `redirect to :10812` (→ `c-A-in` → outbound A).
+- Default TCP → `redirect to :10813` (→ `c-def-in` → Xray routing by rules).
+
+### Fallback (`c-def-in`)
+
+Xray routing `50-routing.json` for inbound `c-def-in`:
+1. `geosite:category-ads-all` → `B` (block).
+2. `geosite:cn`, `geoip:cn`, `geoip:private` → `D` (direct).
+3. `geosite:geolocation-ru` → `D`.
+4. Your `c-T-domains.txt` / `c-A-domains.txt` (inline, not via geosite) → `T` / `A`.
+5. `default` → `T`.
+
+Rule 5 is a configurable safe default; change it in the template.
+
+### Anti-loop
+
+Xray outbounds T/A/D set `sockopt.mark = 0xff` on outgoing sockets.
+First rule in both nft tables: `meta mark 0xff return`. That is sufficient.
+No uid/pid matching is used — it is fragile.
+
+## Naming scheme (fixed)
+
+### Outbounds
+- `T` — proxy outbound 1 (VLESS + Reality)
+- `A` — proxy outbound 2 (VLESS + Reality)
+- `D` — direct (freedom)
+- `B` — block (blackhole)
+
+### Inbounds
+- `r-T-in` — 10801, dokodemo-door, routed → `T`
+- `r-A-in` — 10802, dokodemo-door, routed → `A`
+- `c-D-in` — 10810, dokodemo-door, routed → `D` *(exists, but not used by base nft — see below)*
+- `c-T-in` — 10811, dokodemo-door, routed → `T`
+- `c-A-in` — 10812, dokodemo-door, routed → `A`
+- `c-def-in` — 10813, dokodemo-door, routed by rules
+
+### nft sets
+- Router: `r_T_v4`, `r_A_v4`
+- Clients: `c_D_v4`, `c_T_v4`, `c_A_v4`
+
+### Lists
+- `r-T-ipv4.txt`, `r-A-ipv4.txt`
+- `r-T-domains.txt`, `r-A-domains.txt`
+- `c-D-ipv4.txt`, `c-T-ipv4.txt`, `c-A-ipv4.txt`
+- `c-D-domains.txt`, `c-T-domains.txt`, `c-A-domains.txt`
+
+## File layout on the router
+
+```
+/etc/xray/
+├── secret.env                  # LOCAL, git-ignored, never committed
+├── config.d/                   # rendered Xray JSON (read by xray -confdir)
+│   ├── 00-base.json
+│   ├── 10-inbounds.json
+│   ├── 20-outbounds.json
+│   └── 50-routing.json
+├── nft.d/                      # rendered nft rules
+│   ├── 10-router-output.nft
+│   └── 20-clients-prerouting.nft
+├── lists/
+│   ├── local/                  # manually maintained lists
+│   ├── remote/                 # downloaded remote lists
+│   └── merged/                 # merge + resolve result (IPv4)
+├── templates/                  # cached downloaded templates
+├── state/                      # timestamps, success flags
+├── bin/                        # helper scripts (copies from repo)
+└── dnsmasq.d/
+    └── 90-nftset.conf          # RAW snippet for dnsmasq confdir
+
+/usr/local/xray/xray            # existing binary
+/usr/local/xray/geosite.dat
+/usr/local/xray/geoip.dat
+
+/etc/init.d/xray                # SINGLE start point
+/etc/dnsmasq.d/90-nftset.conf   # symlink to /etc/xray/dnsmasq.d/90-nftset.conf
+```
+
+### Why `xray -confdir`
+
+`xray run -confdir /etc/xray/config.d` reads all `.json` files in alphabetical order and merges them. This allows splitting base config, inbounds, outbounds, and routing — convenient for separate updates and for rendering secrets (outbounds) independently from public templates.
+
+## What is edited locally (NOT committed)
+
+1. `/etc/xray/secret.env` — main secrets file. Format: shell env-file, safe for `. secret.env`. Contains template URLs, list URLs, asset URLs, UUID/PBK/SID/SNI/HOST for T and A.
+2. `/etc/xray/lists/local/*.txt` — your local domain/IP lists that supplement (or fully replace) remote ones.
+
+## What is hosted on GitHub
+
+1. All templates (`xray/*.json.tpl`, `nft/*.nft.tpl`, `dnsmasq/*.conf.tpl`).
+2. All helper scripts (`bin/*.sh`).
+3. Bootstrap (`bootstrap/bootstrap-xray-v2.sh`).
+4. init.d service (`init.d/xray`).
+5. Starter lists (`lists/*.txt`) — examples only, NOT with real sensitive policy.
+6. Example file `examples/secret.env.example`.
+
+Secrets never go to GitHub. `.gitignore` covers `secret.env` as a safeguard.
+
+## First run (end-to-end)
+
+### 1. Fork the repository and edit lists for your needs
+
+You can also start with the default examples.
+
+### 2. On the router, as root:
+
+```sh
+# replace URL with your fork
+export REPO_RAW='https://raw.githubusercontent.com/<you>/<repo>/main'
+wget -O /tmp/bootstrap.sh "$REPO_RAW/bootstrap/bootstrap-xray-v2.sh"
+sh /tmp/bootstrap.sh "$REPO_RAW"
+```
+
+Bootstrap will:
+- create `/etc/xray/{config.d,nft.d,lists/{local,remote,merged},templates,state,bin,dnsmasq.d}`;
+- download helper scripts to `/etc/xray/bin/`;
+- install `/etc/init.d/xray`;
+- **not** start the service;
+- if `secret.env` is absent — place `/etc/xray/secret.env.example` alongside it and print instructions.
+
+### 3. Create `/etc/xray/secret.env`
+
+```sh
+cp /etc/xray/secret.env.example /etc/xray/secret.env
+vi /etc/xray/secret.env
+chmod 600 /etc/xray/secret.env
+```
+
+Fill in the URLs and T/A secrets.
+
+### 4. First managed-apply
+
+```sh
+/etc/xray/bin/update-managed-stack.sh
+/etc/xray/bin/fetch-remote-lists.sh
+/etc/xray/bin/update-sets.sh
+```
+
+Each should finish with `OK` and must not touch working state on error.
+
+### 5. Start
+
+```sh
+/etc/init.d/xray enable
+/etc/init.d/xray start
+```
+
+### 6. Verify
+
+```sh
+# Xray is alive
+pidof xray
+logread -e xray | tail -40
+
+# nft tables are present
+nft list table inet xray_router | head -40
+nft list table inet xray_clients | head -40
+
+# sets are populated
+nft list set inet xray_router r_T_v4 | head
+nft list set inet xray_clients c_T_v4 | head
+
+# router exits via T for an address from r_T_v4
+curl -s -m 5 https://ifconfig.me
+
+# LAN client:
+curl -s https://ifconfig.me
+```
+
+## How to update
+
+Everything is orchestrated by cron (example in `examples/crontab.example`):
+
+- `update-assets.sh` — weekly: update `geosite.dat` / `geoip.dat` from `GEOSITE_URL` / `GEOIP_URL`.
+- `update-managed-stack.sh` — daily: update Xray templates and nft templates from `REPO_RAW`.
+- `fetch-remote-lists.sh` — every few hours: download remote lists.
+- `update-sets.sh` — every 15–30 minutes: merge lists + resolve domains + atomic replace set content.
+
+All scripts are **staged/atomic**:
+1. Download to temp files.
+2. Render/resolve to `.staged`.
+3. Validate: `xray -test`, `nft -c -f`, non-empty result.
+4. Only on success — `mv` into place and soft reload.
+
+On any error — exit 1 + remove temp files, working state is unchanged.
+
+## Rollback
+
+1. **Single bad update.** `/etc/xray/state/` holds `last-good-*.tar.gz` — snapshots of successfully applied configs (templates / config.d / nft.d). Manual restore:
+   ```sh
+   cd /
+   tar xzf /etc/xray/state/last-good-managed.tar.gz
+   /etc/init.d/xray reload
+   ```
+
+2. **Bad lists.** `update-sets.sh` snapshots current set elements before replacing — in `/etc/xray/state/last-good-sets.txt`. Restore:
+   ```sh
+   /etc/xray/bin/update-sets.sh --restore
+   ```
+
+3. **Nuclear option.** `/etc/init.d/xray stop && /etc/init.d/xray disable`. nft tables and ip rules are torn down in `stop_service`. The router keeps working with normal system routing.
+
+## Debugging
+
+```sh
+# what xray is doing
+logread -e xray | tail -200
+
+# live nft
+nft monitor
+
+# rule counters
+nft list ruleset | grep -E 'xray_(router|clients)|counter'
+
+# actual set contents
+nft list set inet xray_clients c_T_v4
+
+# trace update-sets resolution
+sh -x /etc/xray/bin/update-sets.sh
+
+# test any template render
+/etc/xray/bin/render-template.sh /etc/xray/templates/xray/20-outbounds.json.tpl
+```
+
+## Critical path vs. optional
+
+**Critical path (must work):**
+1. `update-sets.sh` (merge + resolve + atomic nft element update)
+2. `nft` rules (`10-router-output.nft`, `20-clients-prerouting.nft`)
+3. Xray with a valid `config.d`
+
+**Optional bonus layers (if broken — the base setup still works):**
+- `dnsmasq/90-nftset.conf` (lazy DNS-driven set filling)
+- `update-managed-stack.sh` (if GitHub is unavailable — continue with local templates)
+- `update-assets.sh` (if geosite/geoip did not update — use the previous ones)
+
+## Design decisions & tradeoffs
+
+These are intentional tradeoffs within the requested architecture.
+
+1. **TCP-only in nft redirect.** Uses `redirect to :port` — this is DNAT, which works for TCP. UDP (including QUIC-443) is **not** intercepted in the base setup and goes direct. UDP requires TPROXY with `meta mark` and `ip rule fwmark lookup`, which adds complexity. The TPROXY option is left as a clearly marked TODO in `nft/20-clients-prerouting.nft.tpl`. Most HTTPS sites fall back to TCP+TLS when QUIC is unavailable — TCP-only is sufficient for most practical cases. Tradeoff: simplicity > completeness.
+
+2. **`c-D-in` exists but is not used by nft by default.** This lets you explicitly route traffic through Xray with D-outbound (for logging / single sniffing point), but in the base critical path we do `return` in nft for `c_D_v4` — one hop fewer.
+
+3. **Anti-loop via `sockopt.mark = 0xff`.** We do not bind to Xray's uid because in OpenWrt procd, Xray may run under an unstable uid, which breaks idempotency. mark 0xff on Xray outgoing sockets via `streamSettings.sockopt.mark` is the most direct and portable approach.
+
+4. **4 separate Xray JSON files via `-confdir`.** This allows:
+   - updating publicly-hostable templates separately from `20-outbounds.json` which holds secrets;
+   - restoring only the needed file during rollback.
+
+5. **dnsmasq via raw confdir snippet, not UCI `list nftset`.** The UCI approach does not work reliably on this OpenWrt build. We place the file in `/etc/dnsmasq.d/` (OpenWrt dnsmasq confdir) as a symlink from `/etc/xray/dnsmasq.d/90-nftset.conf`, so the renderer can rebuild it independently.
+
+6. **POSIX-only templating.** `render-template.sh` uses `sed` with `s|__VAR__|$VALUE|g` on a known list of placeholders. No eval on data, no `envsubst` (sometimes not installed), no `sh -c` with user-supplied values — protection against injection via secret.env.
+
+7. **Lists are plain text.** One host per line, `#` starts a comment. `awk`/`sort`/`uniq` do the rest. No YAML/JSON — nothing to parse complex structures from.
+
+8. **Lightweight rollback snapshots.** `tar czf` on `config.d` + `nft.d` takes negligible space; the last 5 are retained.
+
+## Verifying everything works
+
+```sh
+# 1. Xray service up
+/etc/init.d/xray status           # prints PID
+
+# 2. Xray listen ports
+netstat -lntp | grep -E ':1080[01]|1081[0-3]'
+# expected: 10801, 10802, 10810, 10811, 10812, 10813
+
+# 3. nft tables
+nft list tables | grep -E 'xray_(router|clients)'
+# both should be present
+
+# 4. sets non-empty (after update-sets)
+nft list set inet xray_router r_T_v4 | grep -c '^\s*[0-9]'
+nft list set inet xray_clients c_T_v4 | grep -c '^\s*[0-9]'
+# > 0
+
+# 5. Router E2E: take an IP from r-T-ipv4.txt, add to /etc/hosts,
+#    run curl -s https://ifconfig.me — the outgoing IP should change
+
+# 6. LAN client E2E: from a LAN client run curl https://ifconfig.me
+#    for addresses in c_T_v4 — exits via T; in c_A_v4 — via A; direct — your ISP
+
+# 7. No loop
+nft list ruleset | grep -E 'mark 0xff.*return'
+# should be exactly two lines (router + clients)
+
+# 8. dnsmasq fill (optional)
+dig @127.0.0.1 google.com
+nft list set inet xray_clients c_T_v4   # a freshly resolved IP should appear
+```
+
+## License
+
+See `LICENSE`. MIT.

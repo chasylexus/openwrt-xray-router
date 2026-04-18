@@ -1,0 +1,6 @@
+# r-A-ipv4.txt
+# IPv4 addresses/CIDRs that should be routed from the ROUTER ITSELF via A.
+# One per line. # starts a comment. Whitespace ignored.
+#
+# Examples:
+# 23.0.0.0/8

@@ -1,0 +1,7 @@
+# r-T-ipv4.txt
+# IPv4 addresses/CIDRs that should be routed from the ROUTER ITSELF via T.
+# One per line. # starts a comment. Whitespace ignored.
+#
+# Examples (commented out — uncomment or replace with your real list):
+# 185.199.108.0/22
+# 104.21.0.0/16

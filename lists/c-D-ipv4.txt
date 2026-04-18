@@ -1,0 +1,10 @@
+# c-D-ipv4.txt
+# IPv4 addresses/CIDRs for CLIENT LAN traffic that should go DIRECT.
+# These get nft `return` in prerouting — no Xray hop at all.
+#
+# Typical direct targets: local services you host, local ISP speedtests,
+# domestic CDNs you explicitly want to keep off the tunnel.
+#
+# Examples:
+# 5.255.255.0/24        # yandex
+# 77.88.55.0/24         # yandex

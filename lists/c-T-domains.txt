@@ -1,0 +1,7 @@
+# c-T-domains.txt
+# Domains to force through T for LAN clients.
+#
+# Examples:
+# chat.openai.com
+# chatgpt.com
+# claude.ai

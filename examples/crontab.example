@@ -1,0 +1,21 @@
+# /etc/crontabs/root
+#
+# Add to /etc/crontabs/root and run: /etc/init.d/cron reload
+#
+# Schedule rationale:
+#   update-sets        — fast, cheap, safe; tightest schedule to keep IPs fresh
+#   fetch-remote-lists — pulls upstream changes; moderate
+#   update-managed     — pulls repo templates; slow cadence
+#   update-assets      — geosite/geoip; weekly is plenty
+
+# Refresh nft sets from merged lists every 20 minutes
+*/20 * * * *   /etc/xray/bin/update-sets.sh            >> /tmp/xray-cron.log 2>&1
+
+# Pull remote lists every 4 hours; update-sets runs as its tail
+17 */4 * * *   /etc/xray/bin/fetch-remote-lists.sh     >> /tmp/xray-cron.log 2>&1
+
+# Pull templates/helpers/nft rules from GitHub once a day at 04:23
+23 4 * * *     /etc/xray/bin/update-managed-stack.sh   >> /tmp/xray-cron.log 2>&1
+
+# Pull fresh geosite.dat/geoip.dat once a week (Sunday 05:07)
+7 5 * * 0      /etc/xray/bin/update-assets.sh          >> /tmp/xray-cron.log 2>&1

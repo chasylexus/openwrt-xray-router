@@ -1,0 +1,5 @@
+# c-A-ipv4.txt
+# IPv4 addresses/CIDRs for CLIENT LAN traffic that should be routed via A.
+#
+# Examples:
+# 104.16.0.0/13         # cloudflare (illustrative only)

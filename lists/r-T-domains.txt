@@ -1,0 +1,7 @@
+# r-T-domains.txt
+# Domains that should be routed from the ROUTER ITSELF via T.
+# update-sets.sh resolves each via nslookup and adds IPv4 to r_T_v4.
+# One per line. # starts a comment.
+#
+# Examples:
+# api.mycloud.example
