@@ -235,6 +235,20 @@ In addition to the standard upstream `geosite.dat`, you can load a second geosit
 
 Cron updates the custom file on the same schedule as `geosite.dat` / `geoip.dat`.
 
+## Allow-domains provider (optional)
+
+A third source of domain lists is supported alongside `local/` and `remote/`: a curated provider reachable at a private base URL.
+
+1. Set `ALLOW_DOMAINS_BASE` in `/etc/xray/secret.env` to the provider's base URL. Leave empty to disable.
+2. Path suffixes are hardcoded in `bin/fetch-allow-domains.sh` (the `ITEMS` table) so the upstream identity stays out of the committed repo. Edit that table to add or remove mappings. Defaults:
+   - `Russia/inside-raw.lst` → `c-T-domains.txt`
+3. Downloaded files land at `/etc/xray/lists/remote/allow-<name>.txt` and are unioned into the merged list by `merge-lists.sh` alongside `local/` and `remote/`.
+4. Cron runs `fetch-allow-domains.sh` every 6 hours; it is a silent no-op when `ALLOW_DOMAINS_BASE` is empty.
+
+## Rule ordering
+
+At both the nft and xray layers, A rules are evaluated before T rules. When a destination IP appears in both `c_A_v4`/`r_A_v4` and `c_T_v4`/`r_T_v4` (e.g. Gemini vs Google overlap on the same Google edge IPs), A wins. Domain-level disambiguation for the fallback `c-def-in` inbound is handled inside `xray/50-routing.json.tpl` where specific domains (gemini, netflix, ...) are matched before generic geosite tags.
+
 ## How to update
 
 Everything is orchestrated by cron (example in `examples/crontab.example`):
@@ -242,6 +256,7 @@ Everything is orchestrated by cron (example in `examples/crontab.example`):
 - `update-assets.sh` — weekly: update `geosite.dat` / `geoip.dat` / `geosite-custom.dat` (if `GEOSITE_CUSTOM_URL` is set) from `GEOSITE_URL` / `GEOIP_URL` / `GEOSITE_CUSTOM_URL`.
 - `update-managed-stack.sh` — daily: update Xray templates and nft templates from `REPO_RAW`.
 - `fetch-remote-lists.sh` — every few hours: download remote lists.
+- `fetch-allow-domains.sh` — every 6 hours: download allow-domains provider lists (no-op if `ALLOW_DOMAINS_BASE` is empty).
 - `update-sets.sh` — every 15–30 minutes: merge lists + resolve domains + atomic replace set content.
 
 All scripts are **staged/atomic**:

@@ -86,6 +86,7 @@ update-sets.sh
 update-assets.sh
 update-managed-stack.sh
 fetch-remote-lists.sh
+fetch-allow-domains.sh
 '
 
 log 'downloading helper scripts'

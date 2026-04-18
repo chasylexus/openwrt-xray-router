@@ -38,6 +38,7 @@ for name in $LISTS; do
     {
         [ -r "$L/$name" ] && cat "$L/$name"
         [ -r "$R/$name" ] && cat "$R/$name"
+        [ -r "$R/allow-$name" ] && cat "$R/allow-$name"
     } \
     | sed -e 's/#.*$//' -e 's/[[:space:]]\{1,\}//g' \
     | grep -v '^$' \

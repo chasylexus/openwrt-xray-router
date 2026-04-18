@@ -34,9 +34,9 @@ table inet xray_router {
         # 3. never touch local / private destinations
         ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 224.0.0.0/4 } return
 
-        # 4. policy
-        ip daddr @r_T_v4 counter redirect to :10801 comment "router -> T"
+        # 4. policy (A before T: A wins on IP overlap)
         ip daddr @r_A_v4 counter redirect to :10802 comment "router -> A"
+        ip daddr @r_T_v4 counter redirect to :10801 comment "router -> T"
 
         # 5. else: system default (direct)
     }
@@ -45,7 +45,7 @@ table inet xray_router {
     chain diag {
         type filter hook output priority 0; policy accept;
         meta mark 0xff counter comment "bypass"
-        ip daddr @r_T_v4 counter comment "seen r_T_v4"
         ip daddr @r_A_v4 counter comment "seen r_A_v4"
+        ip daddr @r_T_v4 counter comment "seen r_T_v4"
     }
 }

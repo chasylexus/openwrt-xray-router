@@ -50,9 +50,9 @@ table inet xray_clients {
         # 5. explicit D: direct path, do not hop through Xray at all
         ip daddr @c_D_v4 counter return comment "client -> D (direct)"
 
-        # 6. explicit T / A
-        ip daddr @c_T_v4 counter redirect to :10811 comment "client -> T"
+        # 6. explicit A / T (A before T: A wins on IP overlap)
         ip daddr @c_A_v4 counter redirect to :10812 comment "client -> A"
+        ip daddr @c_T_v4 counter redirect to :10811 comment "client -> T"
 
         # 7. fallback: default Xray inbound handles it by domain/geosite/geoip
         counter redirect to :10813 comment "client -> c-def-in (fallback)"
