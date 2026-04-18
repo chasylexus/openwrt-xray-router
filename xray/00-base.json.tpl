@@ -1,6 +1,6 @@
 {
   "log": {
-    "loglevel": "warning",
+    "loglevel": "info",
     "access": "/tmp/xray-access.log",
     "error": "/tmp/xray-error.log"
   },
