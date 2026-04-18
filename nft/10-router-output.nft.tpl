@@ -34,9 +34,13 @@ table inet xray_router {
         # 3. never touch local / private destinations
         ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 224.0.0.0/4 } return
 
-        # 4. policy (A before T: A wins on IP overlap)
-        ip daddr @r_A_v4 counter redirect to :10802 comment "router -> A"
-        ip daddr @r_T_v4 counter redirect to :10801 comment "router -> T"
+        # 4. policy (A before T: A wins on IP overlap).
+        #    `meta l4proto tcp` is required on each `redirect to :port`
+        #    rule — nft parser needs transport-proto matched *in the
+        #    same rule* for `redirect to :port` (the earlier
+        #    `meta l4proto != tcp return` guard is not enough).
+        meta l4proto tcp ip daddr @r_A_v4 counter redirect to :10802 comment "router -> A"
+        meta l4proto tcp ip daddr @r_T_v4 counter redirect to :10801 comment "router -> T"
 
         # 5. else: system default (direct)
     }
