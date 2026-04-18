@@ -111,6 +111,18 @@
         "type": "field",
         "inboundTag": ["c-def-in"],
         "domain": [
+          "geosite:netflix",
+          "geosite:amazon",
+          "domain:primevideo.com",
+          "domain:peacocktv.com",
+          "domain:paramountplus.com"
+        ],
+        "outboundTag": "A"
+      },
+      {
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "domain": [
           "geosite:openai",
           "geosite:anthropic",
           "geosite:category-ai-!cn",
@@ -164,9 +176,7 @@
         "type": "field",
         "inboundTag": ["c-def-in"],
         "domain": [
-          "geosite:netflix",
           "geosite:spotify",
-          "geosite:amazon",
           "domain:walmart.com",
           "domain:ikea.com.tr",
           "domain:onfastspring.com",
@@ -282,7 +292,6 @@
           "domain:amnezia.org",
           "domain:tunnelbear.com",
           "domain:redshieldvpn.com",
-          "domain:peacocktv.com",
           "domain:playstation.com",
           "domain:2ip.io",
           "domain:2ip.ru",
