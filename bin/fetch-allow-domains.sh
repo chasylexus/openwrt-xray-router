@@ -10,8 +10,10 @@
 # no-op. The path suffixes below are the public, git-tracked portion of the
 # integration: they describe which upstream files map to which local list.
 #
-# Adjust ITEMS to extend coverage. Keep target names aligned with the naming
-# scheme used by merge-lists.sh (c-T-domains.txt, c-A-domains.txt, ...).
+# Multiple suffixes may point at the same target list — they are
+# concatenated into one allow-<target> file. Adjust ITEMS to extend
+# coverage. Keep target names aligned with the naming scheme used by
+# merge-lists.sh (c-T-domains.txt, c-A-domains.txt, ...).
 
 set -eu
 
@@ -41,20 +43,42 @@ else die 'neither curl nor wget present'
 fi
 
 # pairs: <target-list-name> <path-suffix-relative-to-BASE>
+# All suffixes mapped to the same target are concatenated.
 ITEMS='
 c-T-domains.txt Russia/inside-raw.lst
+c-T-domains.txt Services/google_ai.lst
+c-T-domains.txt Services/hdrezka.lst
 '
 
-echo "$ITEMS" | awk 'NF==2 {print $1"\t"$2}' | while IFS="	" read -r name suffix; do
-    url="$BASE/$suffix"
+# Iterate unique targets, concatenating all suffixes into one dst.
+targets=$(echo "$ITEMS" | awk 'NF==2 {print $1}' | sort -u)
+
+for name in $targets; do
     dst="$R/allow-$name"
     tmp="$R/.allow-$name.new.$$"
-    if $DL "$tmp" "$url"; then
+    : > "$tmp"
+    any_ok=0
+    # All suffixes pointing at this target
+    for suffix in $(echo "$ITEMS" | awk -v t="$name" 'NF==2 && $1==t {print $2}'); do
+        url="$BASE/$suffix"
+        part="$R/.allow-$name.part.$$"
+        if $DL "$part" "$url"; then
+            printf '\n# --- %s ---\n' "$suffix" >> "$tmp"
+            cat "$part" >> "$tmp"
+            rm -f "$part"
+            any_ok=1
+            log "  fetched $suffix"
+        else
+            rm -f "$part"
+            warn "  fetch failed: $url"
+        fi
+    done
+    if [ "$any_ok" = 1 ] && [ -s "$tmp" ]; then
         mv "$tmp" "$dst"
-        log "fetched allow-$name ($(wc -l < "$dst" | awk '{print $1}') lines)"
+        log "allow-$name: $(wc -l < "$dst" | awk '{print $1}') lines total"
     else
         rm -f "$tmp"
-        warn "download failed for allow-$name; keeping previous"
+        warn "all fetches failed for $name; keeping previous"
     fi
 done
 
