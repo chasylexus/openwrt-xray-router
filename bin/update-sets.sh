@@ -59,9 +59,9 @@ command -v nft      >/dev/null 2>&1 || die 'nft not found'
 # empty AND the ipv4 companion list is also empty (i.e. we'd clear a live set).
 
 # Helper: resolve one domain -> IPv4 lines. Written to $WORK/resolve-one.sh
-# so xargs -P can spawn it in parallel without quoting hell.
-# Each child does nslookup + per-invocation awk filter, then writes only
-# clean IPv4 lines to stdout — so downstream pipe can mix outputs safely.
+# so we can spawn it in parallel without quoting hell. Each child does
+# nslookup + per-invocation awk filter, then writes only clean IPv4 lines
+# to stdout — so downstream pipe can mix outputs safely.
 write_resolver() {
     cat > "$1" <<'RESOLVE_EOF'
 #!/bin/sh
@@ -77,14 +77,31 @@ RESOLVE_EOF
     chmod +x "$1"
 }
 
-# Detect whether BusyBox xargs understands -P (parallel). On OpenWrt 22+
-# this is usually compiled in; fall back to sequential if not.
-detect_parallel() {
-    if echo x | xargs -P 1 -n 1 true 2>/dev/null; then
-        echo "${RESOLVE_PARALLEL:-16}"
-    else
-        echo 1
-    fi
+# Pure-shell parallel resolver — BusyBox on OpenWrt 25.12 is compiled
+# WITHOUT FEATURE_XARGS_SUPPORT_PARALLEL, so `xargs -P` is unavailable
+# (even `-P 1` errors out). We shard the domain file by `NR % N` into N
+# worker subshells with `&` and join with `wait`. POSIX-guaranteed,
+# no external dependencies.
+#
+# Each worker reads only its slice of the file and calls $RESOLVER
+# sequentially; the N workers run concurrently, giving the same ~N×
+# speedup we used to get from xargs -P.
+parallel_resolve() {
+    df="$1"
+    N="${2:-16}"
+    [ -s "$df" ] || return 0
+    k=0
+    while [ "$k" -lt "$N" ]; do
+        (
+            awk -v n="$N" -v k="$k" 'NR % n == k' "$df" |
+            while IFS= read -r dom; do
+                [ -z "$dom" ] && continue
+                "$RESOLVER" "$dom"
+            done
+        ) &
+        k=$((k + 1))
+    done
+    wait
 }
 
 # Build a staged file per set, source of truth: merged/*.txt
@@ -101,7 +118,7 @@ stage_set() {
             # Parallel DNS resolution — ~10-16x faster on lists with
             # hundreds/thousands of domains. Without this, a cron tick
             # on c-T-domains.txt (~1200 domains) takes 4-5 minutes.
-            xargs -n 1 -P "$PARALLEL" "$RESOLVER" < "$domain_file"
+            parallel_resolve "$domain_file" "$PARALLEL"
         fi
     } | awk '
         /^[0-9]{1,3}(\.[0-9]{1,3}){3}(\/[0-9]{1,2})?$/ { print }
@@ -122,8 +139,8 @@ trap 'rm -rf "$WORK"' EXIT INT TERM
 
 RESOLVER="$WORK/resolve-one.sh"
 write_resolver "$RESOLVER"
-PARALLEL=$(detect_parallel)
-log "resolving domains with parallelism=$PARALLEL"
+PARALLEL="${RESOLVE_PARALLEL:-16}"
+log "resolving domains with parallelism=$PARALLEL (shell-native)"
 
 stage_set inet\ xray_router  r_T_v4 "$MERGED/r-T-ipv4.txt"  "$MERGED/r-T-domains.txt"  "$WORK/r_T_v4"
 stage_set inet\ xray_router  r_A_v4 "$MERGED/r-A-ipv4.txt"  "$MERGED/r-A-domains.txt"  "$WORK/r_A_v4"
