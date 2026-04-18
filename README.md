@@ -45,14 +45,22 @@ or `:10802` (→ `r-A-in` → outbound A). Everything else goes direct (system p
 
 ### Fallback (`c-def-in`)
 
-Xray routing `50-routing.json` for inbound `c-def-in`:
+Xray routing `50-routing.json` for inbound `c-def-in`, evaluated top to bottom (first match wins):
 1. `geosite:category-ads-all` → `B` (block).
-2. `geosite:cn`, `geoip:cn`, `geoip:private` → `D` (direct).
-3. `geosite:geolocation-ru` → `D`.
-4. Your `c-T-domains.txt` / `c-A-domains.txt` (inline, not via geosite) → `T` / `A`.
-5. `default` → `T`.
+2. `geosite:private`, `geosite:cn`, `geosite:geolocation-cn` → `D` (direct).
+3. `geoip:private`, `geoip:cn` → `D`.
+4. `geosite:geolocation-ru` → `D`.
+5. `geosite:apple` → `D`.
+6. `gemini.google.com`, `aistudio.google.com`, `generativelanguage.googleapis.com`, `bard.google.com`, `makersuite.google.com` → `A`.
+7. `geosite:netflix` → `A`.
+8. `geosite:openai`, `geosite:anthropic`, `geosite:category-ai-!cn` → `A`.
+9. `geosite:telegram` and `geoip:telegram` → `T`.
+10. `geosite:google` → `T`.
+11. `default` → `T`.
 
-Rule 5 is a configurable safe default; change it in the template.
+Rule 11 is a configurable safe default; change it in the template.
+
+Specific rules (like Gemini subdomains) must come **before** broader ones (like `geosite:google`) because xray evaluates rules in order. The nft layer cannot express this priority — it works on resolved IPs, which overlap for `google.com` and `gemini.google.com`. For fine-grained splits, rely on the xray layer.
 
 ### Anti-loop
 
@@ -208,11 +216,30 @@ curl -s -m 5 https://ifconfig.me
 curl -s https://ifconfig.me
 ```
 
+## Custom geosite (optional)
+
+In addition to the standard upstream `geosite.dat`, you can load a second geosite file and reference its tags in routing rules.
+
+1. Set `GEOSITE_CUSTOM_URL` in `/etc/xray/secret.env` to the raw URL of a `.dat` file. Empty = disabled.
+2. `update-assets.sh` downloads it to `/usr/local/xray/geosite-custom.dat`, validates the whole asset set via `xray -test`, then atomically replaces the live file. On any error the previous file is retained.
+3. Reference tags in routing rules as `ext:geosite-custom.dat:<tag>`, for example:
+   ```json
+   {
+     "type": "field",
+     "inboundTag": ["c-def-in"],
+     "domain": ["ext:geosite-custom.dat:my-work"],
+     "outboundTag": "A"
+   }
+   ```
+   Place such rules either in `xray/50-routing.json.tpl` (shared, committed to the repo) or in a router-local file like `/etc/xray/config.d/99-local.json` (not overwritten by `update-managed-stack.sh`).
+
+Cron updates the custom file on the same schedule as `geosite.dat` / `geoip.dat`.
+
 ## How to update
 
 Everything is orchestrated by cron (example in `examples/crontab.example`):
 
-- `update-assets.sh` — weekly: update `geosite.dat` / `geoip.dat` from `GEOSITE_URL` / `GEOIP_URL`.
+- `update-assets.sh` — weekly: update `geosite.dat` / `geoip.dat` / `geosite-custom.dat` (if `GEOSITE_CUSTOM_URL` is set) from `GEOSITE_URL` / `GEOIP_URL` / `GEOSITE_CUSTOM_URL`.
 - `update-managed-stack.sh` — daily: update Xray templates and nft templates from `REPO_RAW`.
 - `fetch-remote-lists.sh` — every few hours: download remote lists.
 - `update-sets.sh` — every 15–30 minutes: merge lists + resolve domains + atomic replace set content.

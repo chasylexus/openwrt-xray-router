@@ -1,6 +1,11 @@
 # c-A-domains.txt
 # Domains to force through A for LAN clients.
-#
-# Examples:
-# perplexity.ai
-# api.anthropic.com
+
+# Gemini (kept specific; avoids matching all of google.com)
+gemini.google.com
+aistudio.google.com
+generativelanguage.googleapis.com
+
+# Netflix
+netflix.com
+www.netflix.com

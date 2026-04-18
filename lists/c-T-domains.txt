@@ -1,7 +1,17 @@
 # c-T-domains.txt
 # Domains to force through T for LAN clients.
-#
-# Examples:
-# chat.openai.com
-# chatgpt.com
-# claude.ai
+
+# Google (NOTE: gemini.google.com is listed in c-A-domains.txt; its resolved
+# IPs may overlap with google.com. The xray routing layer handles domain-level
+# specificity via c-def-in when DNS sniffing is available.)
+google.com
+www.google.com
+youtube.com
+www.youtube.com
+youtu.be
+
+# Telegram
+telegram.org
+t.me
+web.telegram.org
+telegra.ph

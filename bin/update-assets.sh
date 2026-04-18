@@ -1,13 +1,17 @@
 #!/bin/sh
 # update-assets.sh
 #
-# Download fresh geosite.dat / geoip.dat into a temp dir, validate that
-# xray -test can load them (using current config.d), then atomically
-# replace the live assets. Rolls back on any failure.
+# Download fresh geosite.dat / geoip.dat (and optionally a custom geosite file)
+# into a temp dir, validate that xray -test can load them (using the current
+# config.d), then atomically replace the live assets. Rolls back on any failure.
 #
 # Env (from /etc/xray/secret.env or /etc/xray/repo.env):
-#   GEOSITE_URL  — full URL to geosite.dat
-#   GEOIP_URL    — full URL to geoip.dat
+#   GEOSITE_URL         — full URL to geosite.dat (required)
+#   GEOIP_URL           — full URL to geoip.dat (required)
+#   GEOSITE_CUSTOM_URL  — full URL to geosite-custom.dat (optional, empty = skipped)
+#
+# Reference the custom file in Xray routing rules as:
+#   "domain": ["ext:geosite-custom.dat:<tag>"]
 
 set -eu
 
@@ -44,6 +48,19 @@ log 'downloading geoip.dat'
 $DL "$tmp/geoip.dat" "$GEOIP_URL" || die 'geoip download failed'
 [ -s "$tmp/geoip.dat" ] || die 'geoip.dat empty'
 
+# Optional custom geosite. If URL is set, fetch new. If not set, keep whatever
+# is currently installed (so xray -test can still resolve ext:geosite-custom.dat
+# references that may exist in the config).
+custom_new=0
+if [ -n "${GEOSITE_CUSTOM_URL:-}" ]; then
+    log 'downloading geosite-custom.dat'
+    $DL "$tmp/geosite-custom.dat" "$GEOSITE_CUSTOM_URL" || die 'geosite-custom download failed'
+    [ -s "$tmp/geosite-custom.dat" ] || die 'geosite-custom.dat empty'
+    custom_new=1
+elif [ -e "$ASSET_DIR/geosite-custom.dat" ]; then
+    cp -p "$ASSET_DIR/geosite-custom.dat" "$tmp/geosite-custom.dat"
+fi
+
 # Validate: point xray at tmp as asset dir and run -test
 log 'validating with xray -test'
 XRAY_LOCATION_ASSET="$tmp" "$XRAY_BIN" -test -confdir "$CONF_DIR" \
@@ -53,14 +70,20 @@ XRAY_LOCATION_ASSET="$tmp" "$XRAY_BIN" -test -confdir "$CONF_DIR" \
 # Atomic replace: backup current, install new
 ts=$(date +%Y%m%d-%H%M%S)
 mkdir -p "$STATE/assets-backup"
-for f in geosite.dat geoip.dat; do
+
+backup_one() {
+    f="$1"
     if [ -e "$ASSET_DIR/$f" ]; then
         cp -p "$ASSET_DIR/$f" "$STATE/assets-backup/${f}.${ts}"
     fi
-done
+}
+
+backup_one geosite.dat
+backup_one geoip.dat
+[ "$custom_new" = "1" ] && backup_one geosite-custom.dat
 
 # keep only 3 most recent backups of each
-for base in geosite.dat geoip.dat; do
+for base in geosite.dat geoip.dat geosite-custom.dat; do
     # shellcheck disable=SC2010
     ls -1t "$STATE/assets-backup/" 2>/dev/null | grep "^${base}\." | awk 'NR>3' \
         | while read -r old; do rm -f "$STATE/assets-backup/$old"; done
@@ -68,6 +91,9 @@ done
 
 mv "$tmp/geosite.dat" "$ASSET_DIR/geosite.dat"
 mv "$tmp/geoip.dat"   "$ASSET_DIR/geoip.dat"
+if [ "$custom_new" = "1" ]; then
+    mv "$tmp/geosite-custom.dat" "$ASSET_DIR/geosite-custom.dat"
+fi
 
 # Ask procd to re-exec xray (gentle reload; procd handles it)
 /etc/init.d/xray reload >/dev/null 2>&1 || true
