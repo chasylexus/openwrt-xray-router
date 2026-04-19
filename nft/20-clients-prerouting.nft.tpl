@@ -85,11 +85,22 @@ table inet xray_clients {
         # 4. User bypass — source clients (e.g. IoT, consoles).
         ip saddr @c_bypass_src_v4 counter return comment "user bypass: src"
 
-        # 5. Private / LAN-local / multicast never cross the proxy.
+        # 5. Private / LAN-local / multicast / broadcast never cross the proxy.
+        # 0.0.0.0/8   — DHCPDISCOVER from a client without an IP yet.
+        # 240.0.0.0/4 — reserved range; covers 255.255.255.255 limited
+        #               broadcast (DHCP renewal, SSDP, some L2 discovery).
         ip daddr {
-            127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12,
-            192.168.0.0/16, 169.254.0.0/16, 224.0.0.0/4
-        } return comment "private / LAN-local / multicast"
+            0.0.0.0/8, 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12,
+            192.168.0.0/16, 169.254.0.0/16,
+            224.0.0.0/4, 240.0.0.0/4
+        } return comment "private / LAN-local / multicast / broadcast"
+
+        # 5b. IPv6 local / link-local / unique-local / multicast.
+        # Without this, IPv6-enabled LAN traffic (mDNS ff02::fb, Neighbor
+        # Discovery, link-local fe80::/10) leaks into TPROXY. The inet
+        # table matches both families, so we must exempt v6 explicitly.
+        ip6 daddr { ::1/128, fc00::/7, fe80::/10, ff00::/8 } \
+            return comment "IPv6 local / link-local / multicast"
 
         # 6. TCP -> c-def-in. xray sniffs HTTP Host / TLS SNI, decides
         #    outbound by domain rule in xray/50-routing.json.tpl.

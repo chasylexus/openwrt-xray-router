@@ -26,6 +26,25 @@
       },
 
       {
+        "_comment": "1b. captive portal probes — NEVER via proxy. Without these, geosite:google catches connectivitycheck.gstatic.com and geosite:microsoft catches msftconnecttest.com -> Android/Windows think there is no internet and drop/reconnect WiFi.",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "domain": [
+          "full:captive.apple.com",
+          "full:connectivitycheck.gstatic.com",
+          "full:connectivity-check.ubuntu.com",
+          "full:detectportal.firefox.com",
+          "full:msftconnecttest.com",
+          "full:www.msftconnecttest.com",
+          "full:www.msftncsi.com",
+          "full:dns.msftncsi.com",
+          "full:nmcheck.gnome.org",
+          "full:network-test.debian.org"
+        ],
+        "outboundTag": "D"
+      },
+
+      {
         "_comment": "2. ads (optional — reject before they can go anywhere)",
         "type": "field",
         "inboundTag": ["c-def-in"],
