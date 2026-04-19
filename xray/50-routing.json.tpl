@@ -195,7 +195,7 @@
       },
 
       {
-        "_comment": "5. Big social / media / search via geosite -> T",
+        "_comment": "5b. Big social / media / search via geosite -> T",
         "type": "field",
         "inboundTag": ["c-def-in"],
         "domain": [
@@ -213,6 +213,24 @@
           "geosite:wikimedia",
           "geosite:bbc",
           "geosite:cnn"
+        ],
+        "outboundTag": "T"
+      },
+
+      {
+        "_comment": "5b. Telegram MTProto DC IP ranges -> T. Mobile/desktop clients connect to datacenters by IP without DNS, so geosite:telegram (which is domain-only) does not catch them. These ranges are stable and not shared with CDNs, so an IP rule is safe.",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "ip": [
+          "5.28.192.0/18",
+          "91.105.192.0/23",
+          "91.108.4.0/22",
+          "91.108.8.0/21",
+          "91.108.16.0/21",
+          "91.108.56.0/22",
+          "95.161.64.0/20",
+          "149.154.160.0/20",
+          "185.76.151.0/24"
         ],
         "outboundTag": "T"
       },
