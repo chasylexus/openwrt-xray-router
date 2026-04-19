@@ -163,11 +163,21 @@ nft list table inet xray_router  >/dev/null 2>&1 || die 'inet xray_router missin
 nft list table inet xray_clients >/dev/null 2>&1 || die 'inet xray_clients missing — run: /etc/init.d/xray reload'
 
 # ------- step 4: snapshot current ----------------------------------------
+#
+# Tolerant: a set may not yet exist during an architecture migration (e.g.
+# first run after introducing a new set in the template but before
+# apply-nft.sh has (re)created the table). Don't abort snapshot in that
+# case — just record the gap as a comment.
+snap_set() {
+    if nft list set inet "$1" "$2" 2>/dev/null; then : ; else
+        printf '# snapshot: set inet %s %s was absent at snapshot time\n' "$1" "$2"
+    fi
+}
 {
-    nft list set inet xray_router   r_T_v4
-    nft list set inet xray_router   r_A_v4
-    nft list set inet xray_clients  c_bypass_dst_v4
-    nft list set inet xray_clients  c_bypass_src_v4
+    snap_set xray_router   r_T_v4
+    snap_set xray_router   r_A_v4
+    snap_set xray_clients  c_bypass_dst_v4
+    snap_set xray_clients  c_bypass_src_v4
 } > "$LAST_GOOD.new.$$"
 mv "$LAST_GOOD.new.$$" "$LAST_GOOD"
 
@@ -192,6 +202,15 @@ build_add() {
     table="$1"
     name="$2"
     src="$3"
+    # Tolerant to partial-migration state: if the target set is not yet
+    # in kernel (e.g. apply-nft has not run with the latest template),
+    # skip rather than abort the whole transaction. The next
+    # apply-nft → update-sets cycle will catch up.
+    if ! nft list set inet "$table" "$name" >/dev/null 2>&1; then
+        printf '[update-sets] skip: set inet %s %s absent in kernel (run apply-nft first)\n' \
+            "$table" "$name" >&2
+        return 0
+    fi
     # Always flush — even for empty sets — so stale entries are cleared.
     printf 'flush set inet %s %s\n' "$table" "$name"
     [ -s "$src" ] || return 0

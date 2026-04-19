@@ -92,11 +92,19 @@ log 'xray -test against staged config'
 "$XRAY_BIN" -test -confdir "$stage/config.d" >"$stage/xray-test.log" 2>&1 \
     || { cat "$stage/xray-test.log" >&2; die 'xray -test rejected new config'; }
 
-# ------- 4. validate nft (syntax only; not applied yet) -----------------
-
-for f in "$stage/nft.d"/*.nft; do
-    nft -c -f "$f" || die "nft -c rejected $f"
-done
+# ------- 4. validate nft (syntax + live-state compatibility) -----------
+#
+# Individual `nft -c -f <file>` is NOT enough: if a live chain has a
+# different declaration than the staged one (e.g. type nat -> type
+# filter during REDIRECT -> TPROXY migration), nft rejects the file as
+# redefining a chain with different properties. We must show nft the
+# delete-then-add transaction as a whole, matching what apply-nft.sh
+# actually does at apply time.
+{
+    nft list table inet xray_router  >/dev/null 2>&1 && echo 'delete table inet xray_router;'
+    nft list table inet xray_clients >/dev/null 2>&1 && echo 'delete table inet xray_clients;'
+    cat "$stage/nft.d"/*.nft
+} | nft -c -f - || die 'nft -c rejected staged ruleset (chain type conflict with live state?)'
 
 # ------- 5. snapshot current ---------------------------------------------
 

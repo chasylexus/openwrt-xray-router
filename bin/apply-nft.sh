@@ -56,18 +56,29 @@ trap 'rm -f "$staged_router" "$staged_clients"' EXIT INT TERM
 "$RENDER" "$TPL_DIR/10-router-output.nft.tpl"    > "$staged_router"  || die 'render failed: router'
 "$RENDER" "$TPL_DIR/20-clients-prerouting.nft.tpl" > "$staged_clients" || die 'render failed: clients'
 
-# Validate (nft -c does a full parse without applying)
-nft -c -f "$staged_router"  || die 'nft -c rejected router file'
-nft -c -f "$staged_clients" || die 'nft -c rejected clients file'
-
-# Apply: delete-then-add, inside a single nft invocation to minimise gap.
-# We read both files into one stdin stream, prefixed with destructive deletes.
-{
+# Build the full transaction: optional `delete table` preamble (if a
+# previous ruleset is in kernel) followed by the staged ruleset. We emit
+# this function twice — once with `nft -c` for validation, once with
+# `nft` for apply — so both see the SAME transaction.
+#
+# Why the preamble matters: `nft -c -f <file>` validates against live
+# state. If the staged file redeclares a chain with a different `type`
+# (e.g. nat hook prerouting -> filter hook prerouting when migrating
+# REDIRECT -> TPROXY), nft rejects it as a conflicting redefinition.
+# Prepending `delete table` shows nft the full delete-then-add plan and
+# the validation passes.
+build_transaction() {
     nft list table inet xray_router  >/dev/null 2>&1 && echo 'delete table inet xray_router;'
     nft list table inet xray_clients >/dev/null 2>&1 && echo 'delete table inet xray_clients;'
     cat "$staged_router"
     cat "$staged_clients"
-} | nft -f - || die 'nft -f failed during atomic swap'
+}
+
+# Validate (nft -c runs the full transaction in dry-run; no state change).
+build_transaction | nft -c -f - || die 'nft -c rejected staged ruleset'
+
+# Apply atomically: same transaction, without -c.
+build_transaction | nft    -f - || die 'nft -f failed during atomic swap'
 
 mv "$staged_router"  "$OUT_DIR/10-router-output.nft"
 mv "$staged_clients" "$OUT_DIR/20-clients-prerouting.nft"
