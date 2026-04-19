@@ -1,0 +1,25 @@
+# c-bypass-dst-v4.txt
+# IPv4 destinations that should NEVER be proxied through xray.
+# These get nft `return` in the client prerouting chain — no TPROXY,
+# no xray touch at all. Traffic goes via normal routing (usually WAN).
+#
+# --- Good candidates (stable, non-CDN) ---
+#   - your VPS / proxy endpoint IP (defense-in-depth on top of mark 0xff)
+#   - public DNS you want direct: 1.1.1.1, 8.8.8.8, 9.9.9.9
+#   - local NAS / self-hosted servers with a public IP
+#   - cloud services that dislike being proxied (some banks, Steam, DRM)
+#
+# --- BAD candidates (CDN — do NOT list these) ---
+#   - Cloudflare (104.16.0.0/12, 172.64.0.0/13, ...)
+#   - AWS / Google Cloud / Azure edge
+#   - Fastly / Akamai / Google CDN
+# These CDNs host hundreds of unrelated services per IP. Bypassing by IP
+# means bypassing half the internet — use xray domain routing instead
+# (add `outboundTag: "D"` rules in xray/50-routing.json.tpl).
+#
+# Format: one IP or CIDR per line. # starts a comment. Empty lines ignored.
+#
+# Examples (uncomment to enable):
+# 1.1.1.1
+# 8.8.8.8
+# 203.0.113.5/32         # my VPS

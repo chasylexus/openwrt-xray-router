@@ -108,6 +108,7 @@ done
 LIST_FILES='
 r-T-ipv4.txt r-A-ipv4.txt
 r-T-domains.txt r-A-domains.txt
+c-bypass-dst-v4.txt c-bypass-src-v4.txt
 c-D-ipv4.txt c-T-ipv4.txt c-A-ipv4.txt
 c-D-domains.txt c-T-domains.txt c-A-domains.txt
 '

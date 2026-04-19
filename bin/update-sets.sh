@@ -4,10 +4,16 @@
 # Merge lists, resolve domain lists to IPv4 via nslookup, and atomically
 # replace the element contents of nft sets (no table rebuild).
 #
-# Sets (router-side only — client-side sets removed when nft client
-# chain was simplified to a dumb redirect-all-to-c-def-in):
-#   r_T_v4 <- r-T-ipv4.txt + resolve(r-T-domains.txt)
-#   r_A_v4 <- r-A-ipv4.txt + resolve(r-A-domains.txt)
+# Sets:
+#   Router-side (nat/output, REDIRECT to loopback):
+#     r_T_v4          <- r-T-ipv4.txt + resolve(r-T-domains.txt)
+#     r_A_v4          <- r-A-ipv4.txt + resolve(r-A-domains.txt)
+#
+#   Client-side (prerouting, TPROXY) — user-curated bypass. These skip
+#   xray entirely (return from prerouting). NOT per-outbound routing
+#   (that lives in xray — see commit 7f118eb for CDN-collision rationale):
+#     c_bypass_dst_v4 <- c-bypass-dst-v4.txt (static IPs, no resolve)
+#     c_bypass_src_v4 <- c-bypass-src-v4.txt (LAN source IPs, no resolve)
 #
 # Safe: snapshots current set contents to /etc/xray/state/last-good-sets.txt
 # before replacing. On any resolution error that produces an empty result for
@@ -140,12 +146,17 @@ write_resolver "$RESOLVER"
 PARALLEL="${RESOLVE_PARALLEL:-16}"
 log "resolving domains with parallelism=$PARALLEL (shell-native)"
 
-# NOTE: client-side c_D_v4/c_T_v4/c_A_v4 sets were removed when we
-# simplified the nft client chain to a dumb redirect-all-to-c-def-in
-# (see nft/20-clients-prerouting.nft.tpl). Domain-based routing now
-# lives entirely in xray. Only router-side r_T_v4/r_A_v4 remain.
-stage_set inet\ xray_router  r_T_v4 "$MERGED/r-T-ipv4.txt"  "$MERGED/r-T-domains.txt"  "$WORK/r_T_v4"
-stage_set inet\ xray_router  r_A_v4 "$MERGED/r-A-ipv4.txt"  "$MERGED/r-A-domains.txt"  "$WORK/r_A_v4"
+# NOTE: per-outbound client-side sets (c_D_v4 / c_T_v4 / c_A_v4) were
+# removed in 7f118eb — domain-based routing lives entirely in xray because
+# IP-level matching breaks on CDNs. The client-side bypass sets below are
+# safe because they only make "skip xray entirely" decisions; no
+# domain-to-outbound mapping happens at this layer.
+#
+# /dev/null as domain_file => IPs only, no resolve step.
+stage_set inet\ xray_router   r_T_v4           "$MERGED/r-T-ipv4.txt"         "$MERGED/r-T-domains.txt"   "$WORK/r_T_v4"
+stage_set inet\ xray_router   r_A_v4           "$MERGED/r-A-ipv4.txt"         "$MERGED/r-A-domains.txt"   "$WORK/r_A_v4"
+stage_set inet\ xray_clients  c_bypass_dst_v4  "$MERGED/c-bypass-dst-v4.txt"  /dev/null                   "$WORK/c_bypass_dst_v4"
+stage_set inet\ xray_clients  c_bypass_src_v4  "$MERGED/c-bypass-src-v4.txt"  /dev/null                   "$WORK/c_bypass_src_v4"
 
 # ------- step 3: validate: tables must exist ------------------------------
 nft list table inet xray_router  >/dev/null 2>&1 || die 'inet xray_router missing — run: /etc/init.d/xray reload'
@@ -153,14 +164,17 @@ nft list table inet xray_clients >/dev/null 2>&1 || die 'inet xray_clients missi
 
 # ------- step 4: snapshot current ----------------------------------------
 {
-    nft list set inet xray_router  r_T_v4
-    nft list set inet xray_router  r_A_v4
+    nft list set inet xray_router   r_T_v4
+    nft list set inet xray_router   r_A_v4
+    nft list set inet xray_clients  c_bypass_dst_v4
+    nft list set inet xray_clients  c_bypass_src_v4
 } > "$LAST_GOOD.new.$$"
 mv "$LAST_GOOD.new.$$" "$LAST_GOOD"
 
 # ------- step 5: dry-run path -------------------------------------------
 if [ "$mode" = "--dry-run" ]; then
-    for s in r_T_v4 r_A_v4; do
+    for s in r_T_v4 r_A_v4 c_bypass_dst_v4 c_bypass_src_v4; do
+        [ -f "$WORK/$s" ] || continue
         n=$(wc -l < "$WORK/$s")
         log "$s would have $n elements"
     done
@@ -178,8 +192,9 @@ build_add() {
     table="$1"
     name="$2"
     src="$3"
-    [ -s "$src" ] || return 0
+    # Always flush — even for empty sets — so stale entries are cleared.
     printf 'flush set inet %s %s\n' "$table" "$name"
+    [ -s "$src" ] || return 0
     printf 'add element inet %s %s { ' "$table" "$name"
     # comma-separated, multiline tolerated
     first=1
@@ -196,15 +211,18 @@ build_add() {
 }
 
 {
-    build_add xray_router  r_T_v4 "$WORK/r_T_v4"
-    build_add xray_router  r_A_v4 "$WORK/r_A_v4"
+    build_add xray_router   r_T_v4          "$WORK/r_T_v4"
+    build_add xray_router   r_A_v4          "$WORK/r_A_v4"
+    build_add xray_clients  c_bypass_dst_v4 "$WORK/c_bypass_dst_v4"
+    build_add xray_clients  c_bypass_src_v4 "$WORK/c_bypass_src_v4"
 } > "$WORK/apply.nft"
 
 nft -c -f "$WORK/apply.nft" || die 'nft -c rejected the generated script'
 nft    -f "$WORK/apply.nft" || die 'nft -f failed during apply (state may be partial; last-good-sets.txt is safe)'
 
 # ------- step 7: done ----------------------------------------------------
-for s in r_T_v4 r_A_v4; do
+for s in r_T_v4 r_A_v4 c_bypass_dst_v4 c_bypass_src_v4; do
+    [ -f "$WORK/$s" ] || continue
     n=$(wc -l < "$WORK/$s" | awk '{print $1}')
     log "$s applied ($n elements)"
 done

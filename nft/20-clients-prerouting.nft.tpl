@@ -1,50 +1,114 @@
 #
-# xray_clients — dumb transparent redirect for LAN client TCP.
-# Hook: nat/prerouting, interface __LAN_IF__ (default br-lan).
-# Anti-loop: packets originating on the router never hit this chain.
+# xray_clients — TPROXY transparent proxy for LAN client TCP + UDP.
+# Hook: prerouting, filter-type at mangle priority.
+# Interface: __LAN_IF__ (default br-lan).
 #
 # Rendered from: 20-clients-prerouting.nft.tpl
 #
-# Design note — SIMPLIFIED from the earlier per-set-match architecture:
+# --- Why TPROXY instead of REDIRECT ---
 #
-#   Previous: c_D_v4/c_T_v4/c_A_v4 sets filled by update-sets.sh +
-#   dnsmasq nftset, matched at nft level so xray saw traffic pre-split
-#   by outbound. Sounded fast, but shared CDN IPs (AWS/Google) between
-#   listed and unlisted domains caused wrong-outbound routing — e.g.
-#   api.ipify.org going through A because its IP overlapped with
-#   ai.google.dev.
+# REDIRECT (nat/prerouting) handles TCP only. QUIC is UDP 443 — it bypassed
+# us entirely, and apps that prefer HTTP/3 (native ChatGPT / iOS Safari /
+# macOS apps with alt-svc cached) leaked the real IP. TPROXY delivers both
+# TCP and UDP to a local socket without rewriting the packet, so xray can
+# sniff original destination + SNI + QUIC ClientHello alike.
 #
-#   Now: nft just redirects every LAN TCP flow (minus private dst) to a
-#   single xray inbound c-def-in:10813. xray does sniff + domain-based
-#   routing with zero IP-collision ambiguity. Router-side (nat/output)
-#   still uses r_T_v4/r_A_v4 because there the set is small and stable.
+# --- What decisions live at the nft layer ---
 #
-# UDP is intentionally NOT intercepted here. See README design notes.
-# To add UDP later, switch to TPROXY + ip rule fwmark + local table.
+# We deliberately DO NOT do per-outbound routing here (no c_T_v4/c_A_v4/...).
+# That was the pre-7f118eb design; it failed on CDN-shared IPs, e.g.
+# api.ipify.org landing in c_A_v4 via a Google-AI IP collision.
+#
+# nft is the right place for decisions that are stable by IP alone:
+#   - anti-loop (mark 0xff)
+#   - interface filter (only LAN-originated)
+#   - user-curated bypass (c_bypass_dst_v4, c_bypass_src_v4)
+#   - private / loopback / multicast destinations
+#
+# Everything else is TPROXY'd into c-def-in:10813 where xray makes the
+# outbound choice based on sniffed domain — the only reliable source of
+# truth in a post-SNI-fronted, CDN-saturated internet.
+#
+# --- Anti-loop ---
+#
+# Xray outbounds are configured with sockopt.mark = 0xff. Those packets
+# bypass this chain via the first rule. Double-checked against
+# apply-iprules.sh, which also points mark 0xff at the main table —
+# defense-in-depth.
 #
 
 table inet xray_clients {
 
-    chain prerouting {
-        type nat hook prerouting priority -100; policy accept;
+    # ---- user-curated bypass sets ----
+    #
+    # Populated by update-sets.sh from /etc/xray/lists/.../c-bypass-*.txt.
+    # Static IPs only — never put CDN IPs here (Cloudflare / Google edge
+    # serves dozens of unrelated services per IP; bypassing by IP means
+    # bypassing unrelated traffic you probably wanted proxied).
+    #
+    # Good examples: your VPS IP (defense-in-depth), 1.1.1.1 / 8.8.8.8 if
+    # you want direct DNS, local NAS public IP, banks that dislike proxies.
+    #
+    set c_bypass_dst_v4 {
+        type ipv4_addr
+        flags interval
+        auto-merge
+    }
 
-        # 1. anti-loop: defensive — prerouting does not normally see local-origin
-        #    packets, but tproxy/tproxy-like configs can confuse that. Cheap.
+    # Source bypass — "this LAN device is never proxied".
+    # Good examples: IoT, game consoles, guest devices with their own VPN,
+    # a control laptop you keep on direct for A/B comparison.
+    #
+    set c_bypass_src_v4 {
+        type ipv4_addr
+    }
+
+    # ---- prerouting: the TPROXY hook ----
+    #
+    # Priority mangle (-150): runs after conntrack init (-200) but before
+    # any nat hook (nat/prerouting is -100, fw4's dstnat similar). We need
+    # to be BEFORE nat so we can grab the packet untouched.
+    #
+    chain prerouting {
+        type filter hook prerouting priority -150; policy accept;
+
+        # 1. Anti-loop: xray-own outbound sockets (SO_MARK=0xff).
+        #    Must be first — these packets should never feed back into us.
         meta mark 0xff return
 
-        # 2. only traffic arriving on LAN
+        # 2. Only LAN-originated traffic.
         iifname != "__LAN_IF__" return
 
-        # 3. IPv4 TCP only
-        meta nfproto ipv4 counter comment "xray_clients: ipv4 in"
-        meta l4proto != tcp return
+        # 3. User bypass — destinations (e.g. VPS IP, direct-DNS, banks).
+        ip daddr @c_bypass_dst_v4 counter return comment "user bypass: dst"
 
-        # 4. never touch local / private destinations (LAN-to-LAN, loopback, link-local, multicast)
-        ip daddr { 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 224.0.0.0/4 } return
+        # 4. User bypass — source clients (e.g. IoT, consoles).
+        ip saddr @c_bypass_src_v4 counter return comment "user bypass: src"
 
-        # 5. redirect EVERYTHING else to xray c-def-in.
-        #    `meta l4proto tcp` must be on every rule that contains
-        #    `redirect to :port` (nft parser requirement).
-        meta l4proto tcp counter redirect to :10813 comment "client -> c-def-in (ALL)"
+        # 5. Private / LAN-local / multicast never cross the proxy.
+        ip daddr {
+            127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12,
+            192.168.0.0/16, 169.254.0.0/16, 224.0.0.0/4
+        } return comment "private / LAN-local / multicast"
+
+        # 6. TCP -> c-def-in. xray sniffs HTTP Host / TLS SNI, decides
+        #    outbound by domain rule in xray/50-routing.json.tpl.
+        meta l4proto tcp tproxy to :10813 meta mark set 0x1 counter \
+            comment "TCP -> c-def-in (sniff + domain routing)"
+
+        # 7. UDP -> c-def-in. xray sniffs QUIC ClientHello (SNI), decides
+        #    the same way. Without this, HTTP/3 (UDP 443) leaks past us
+        #    and apps see the real IP — the whole reason we moved off
+        #    REDIRECT.
+        meta l4proto udp tproxy to :10813 meta mark set 0x1 counter \
+            comment "UDP -> c-def-in (QUIC sniff)"
+    }
+
+    # ---- diagnostics (no-op, readable via `nft list ruleset`) ----
+    chain diag {
+        type filter hook prerouting priority 0; policy accept;
+        meta mark 0xff counter comment "xray-own (bypass)"
+        ip daddr @c_bypass_dst_v4 counter comment "bypass dst hits"
+        ip saddr @c_bypass_src_v4 counter comment "bypass src hits"
     }
 }

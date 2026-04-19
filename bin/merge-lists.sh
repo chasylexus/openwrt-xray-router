@@ -29,9 +29,14 @@ mkdir -p "$M"
 LISTS='
 r-T-ipv4.txt r-A-ipv4.txt
 r-T-domains.txt r-A-domains.txt
+c-bypass-dst-v4.txt c-bypass-src-v4.txt
 c-D-ipv4.txt c-T-ipv4.txt c-A-ipv4.txt
 c-D-domains.txt c-T-domains.txt c-A-domains.txt
 '
+# NOTE: c-D/c-T/c-A-{ipv4,domains}.txt are LEGACY (pre-7f118eb per-outbound
+# nft sets). Kept in the merge list so existing local/remote overrides are
+# not silently dropped; nothing reads the merged output any more. Will be
+# removed in a later cleanup pass.
 
 for name in $LISTS; do
     tmp="$M/.${name}.staged.$$"
