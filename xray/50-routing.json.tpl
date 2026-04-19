@@ -103,6 +103,16 @@
       },
 
       {
+        "_comment": "3c. IP geolocation / 'what is my IP' checks -> A (verify second exit independently)",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "domain": [
+          "domain:whatismyip.com"
+        ],
+        "outboundTag": "A"
+      },
+
+      {
         "_comment": "4a. OpenAI / ChatGPT -> T",
         "type": "field",
         "inboundTag": ["c-def-in"],
