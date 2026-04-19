@@ -269,6 +269,8 @@
           "domain:filmix.ac",
           "domain:kino.pub",
           "domain:kinopub.online",
+          "domain:kinopub.me",
+          "domain:service-kp.com",
           "domain:kinogo.biz",
           "domain:ottclub.tv",
           "domain:speedtest.net",
