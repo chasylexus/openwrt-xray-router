@@ -195,7 +195,7 @@
       },
 
       {
-        "_comment": "5b. Big social / media / search via geosite -> T",
+        "_comment": "5a. Big social / media / search via geosite -> T",
         "type": "field",
         "inboundTag": ["c-def-in"],
         "domain": [
