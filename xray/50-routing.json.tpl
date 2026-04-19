@@ -203,6 +203,13 @@
           "geosite:spotify",
           "geosite:facebook",
           "geosite:instagram",
+          "geosite:whatsapp",
+          "domain:whatsapp.com",
+          "domain:whatsapp.net",
+          "domain:whatsapp.biz",
+          "domain:bintray.com",
+          "full:graph.facebook.com",
+          "keyword:whatsapp",
           "geosite:twitter",
           "geosite:telegram",
           "geosite:tiktok",
@@ -231,6 +238,26 @@
           "95.161.64.0/20",
           "149.154.160.0/20",
           "185.76.151.0/24"
+        ],
+        "outboundTag": "T"
+      },
+
+      {
+        "_comment": "5c. WhatsApp IP ranges -> T. App connects to Meta DC by IP for media/push without DNS, so domain rules alone miss them.",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "ip": [
+          "158.85.224.160/27",
+          "158.85.46.128/27",
+          "158.85.5.192/27",
+          "173.192.222.160/27",
+          "173.192.231.32/27",
+          "208.43.122.128/27",
+          "184.173.128.0/17",
+          "50.22.198.204/30" #,
+          # "18.194.0.0/15",
+          # "34.224.0.0/12",
+          # "54.242.0.0/15"
         ],
         "outboundTag": "T"
       },
