@@ -50,6 +50,14 @@
 # included here. Broader upstream ranges (/22, /20, /16, /12, /8, ...) are
 # intentionally omitted so cron updates stay quiet and we do not widen the
 # nft-stage match beyond the current safety envelope.
+#
+# Apple TV follow-up (2026-04-21):
+# Narrow /32 additions observed as repeated `[c-def-in -> D]` destinations from
+# the likely Apple TV client during live reproduction. Kept as exact IPs
+# because these are CDN/shared-edge addresses and widening them to CIDR would
+# be much riskier than a targeted /32.
+104.21.12.188
+172.67.132.76
 104.20.46.132
 104.21.112.1
 104.21.16.1
