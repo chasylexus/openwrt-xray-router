@@ -37,7 +37,10 @@ fi
 
 mkdir -p "$STATE" "$TPL_DIR/xray" "$TPL_DIR/nft" "$TPL_DIR/dnsmasq"
 stage=$(mktemp -d "$STATE/managed.XXXXXX") || die 'mktemp failed'
-mkdir -p "$stage/xray" "$stage/nft" "$stage/dnsmasq" "$stage/config.d" "$stage/nft.d" "$stage/dnsmasq.d"
+mkdir -p \
+    "$stage/xray" "$stage/nft" "$stage/dnsmasq" \
+    "$stage/bin" "$stage/lists" \
+    "$stage/config.d" "$stage/nft.d" "$stage/dnsmasq.d"
 trap 'rm -rf "$stage"' EXIT INT TERM
 
 # ------- 1. download templates -------------------------------------------
@@ -47,6 +50,21 @@ dl_tpl() {
     url="$REPO_RAW/$sub/$fname"
     $DL "$stage/$sub/$fname" "$url" || die "download failed: $url"
     [ -s "$stage/$sub/$fname" ]    || die "empty template: $fname"
+}
+
+dl_bin() {
+    fname="$1"
+    url="$REPO_RAW/bin/$fname"
+    $DL "$stage/bin/$fname" "$url" || die "download failed: $url"
+    [ -s "$stage/bin/$fname" ]     || die "empty helper: $fname"
+    head -1 "$stage/bin/$fname" | grep -q '^#!' || die "not a shell script: $fname"
+}
+
+dl_list_seed() {
+    fname="$1"
+    url="$REPO_RAW/lists/$fname"
+    $DL "$stage/lists/$fname" "$url" || die "download failed: $url"
+    [ -s "$stage/lists/$fname" ]     || die "empty list seed: $fname"
 }
 
 log 'downloading xray templates'
@@ -64,6 +82,16 @@ if ! $DL "$stage/dnsmasq/90-nftset.conf.tpl" "$REPO_RAW/dnsmasq/90-nftset.conf.t
     warn 'dnsmasq template download failed; continuing (bonus layer)'
     : > "$stage/dnsmasq/90-nftset.conf.tpl"
 fi
+
+log 'downloading managed helper scripts'
+for f in merge-lists.sh update-sets.sh update-managed-stack.sh; do
+    dl_bin "$f"
+done
+
+log 'downloading starter lists'
+for f in c-T-dst-v4.txt c-A-dst-v4.txt; do
+    dl_list_seed "$f"
+done
 
 # ------- 2. render -------------------------------------------------------
 
@@ -150,6 +178,17 @@ else
     [ -L /etc/dnsmasq.d/90-nftset.conf ] && rm -f /etc/dnsmasq.d/90-nftset.conf
     [ -e "$DNS_D/90-nftset.conf" ] && rm -f "$DNS_D/90-nftset.conf"
 fi
+
+for f in merge-lists.sh update-sets.sh update-managed-stack.sh; do
+    cp -p "$stage/bin/$f" "$XRAY_ROOT/bin/$f.new.$$"
+    chmod 755 "$XRAY_ROOT/bin/$f.new.$$"
+    mv "$XRAY_ROOT/bin/$f.new.$$" "$XRAY_ROOT/bin/$f"
+done
+
+for f in c-T-dst-v4.txt c-A-dst-v4.txt; do
+    [ -e "$XRAY_ROOT/lists/local/$f" ] && continue
+    cp -p "$stage/lists/$f" "$XRAY_ROOT/lists/local/$f"
+done
 
 # ------- 7. apply --------------------------------------------------------
 
