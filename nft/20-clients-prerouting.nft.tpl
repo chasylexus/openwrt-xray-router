@@ -145,16 +145,16 @@ table inet xray_clients {
         #     and c-A-in -> A unconditionally; no domain sniff needed.
         #     Order matters: T checked before A. If both lists contain
         #     the same IP, T wins.
-        ip daddr @c_T_dst_v4 meta l4proto tcp tproxy to :10811 \
+        ip daddr @c_T_dst_v4 meta l4proto tcp tproxy ip to :10811 \
             meta mark set 0x1 counter \
             comment "TCP dst -> c-T-in (per-IP T)"
-        ip daddr @c_T_dst_v4 meta l4proto udp tproxy to :10811 \
+        ip daddr @c_T_dst_v4 meta l4proto udp tproxy ip to :10811 \
             meta mark set 0x1 counter \
             comment "UDP dst -> c-T-in (per-IP T)"
-        ip daddr @c_A_dst_v4 meta l4proto tcp tproxy to :10812 \
+        ip daddr @c_A_dst_v4 meta l4proto tcp tproxy ip to :10812 \
             meta mark set 0x1 counter \
             comment "TCP dst -> c-A-in (per-IP A)"
-        ip daddr @c_A_dst_v4 meta l4proto udp tproxy to :10812 \
+        ip daddr @c_A_dst_v4 meta l4proto udp tproxy ip to :10812 \
             meta mark set 0x1 counter \
             comment "UDP dst -> c-A-in (per-IP A)"
 
