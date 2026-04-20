@@ -11,6 +11,9 @@
 # Refresh nft sets from merged lists every 20 minutes
 */20 * * * *   /etc/xray/bin/update-sets.sh            >> /tmp/xray-cron.log 2>&1
 
+# Bound hot /tmp logs every 10 minutes (silent; details go to syslog if trimmed)
+*/10 * * * *   /etc/xray/bin/cap-volatile-logs.sh      >/dev/null 2>&1
+
 # Pull remote lists every 4 hours; update-sets runs as its tail
 17 */4 * * *   /etc/xray/bin/fetch-remote-lists.sh     >> /tmp/xray-cron.log 2>&1
 

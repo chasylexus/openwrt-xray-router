@@ -258,6 +258,7 @@ Everything is orchestrated by cron (example in `examples/crontab.example`):
 - `fetch-remote-lists.sh` — every few hours: download remote lists.
 - `fetch-allow-domains.sh` — every 6 hours: download allow-domains provider lists (no-op if `ALLOW_DOMAINS_BASE` is empty).
 - `update-sets.sh` — every 15–30 minutes: merge lists + resolve domains + atomic replace set content.
+- `cap-volatile-logs.sh` — every 10 minutes: trim `/tmp/xray-*.log` and `/tmp/xray-cron.log` in place to bounded size.
 
 All scripts are **staged/atomic**:
 1. Download to temp files.

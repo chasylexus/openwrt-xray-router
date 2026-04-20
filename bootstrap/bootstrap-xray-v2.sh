@@ -84,6 +84,7 @@ run-xray.sh
 merge-lists.sh
 update-sets.sh
 update-assets.sh
+cap-volatile-logs.sh
 update-managed-stack.sh
 fetch-remote-lists.sh
 fetch-allow-domains.sh
