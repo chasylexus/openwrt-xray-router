@@ -385,6 +385,17 @@
       },
 
       {
+        "_comment": "7b. KinoPub Apple TV fallback IPs -> T. These are exact /32s observed from the Apple TV client when sniff/domain routing did not recover a match, so keep them narrow and revisit only if they stop appearing.",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "ip": [
+          "104.21.12.188",
+          "172.67.132.76"
+        ],
+        "outboundTag": "T"
+      },
+
+      {
         "_comment": "8. fallback: anything not matched above goes direct (home ISP)",
         "type": "field",
         "inboundTag": ["c-def-in"],
