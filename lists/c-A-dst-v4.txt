@@ -1,0 +1,18 @@
+# c-A-dst-v4.txt
+# IPv4 destinations forced through the A outbound by destination IP.
+# Populated into nft set c_A_dst_v4; matched in xray_clients prerouting,
+# TPROXY'd to xray inbound c-A-in:10812, which routes unconditionally
+# to outbound A (xray/50-routing.json.tpl).
+#
+# Same shape and same rationale as c-T-dst-v4.txt — see that file for
+# the full "when to use this" decision tree and the width-filter notes.
+#
+# Order in nft prerouting: T checked before A. If an IP is in BOTH
+# lists, T wins. Don't duplicate; pick one.
+#
+# --- Format ---
+#
+# One IP or CIDR per line. # starts a comment. Empty lines ignored.
+# Examples (uncomment to enable):
+# 192.0.2.10                  # IP-geo verifier endpoint
+# 192.0.2.0/27                # narrow regional cluster

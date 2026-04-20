@@ -15,19 +15,28 @@
 #
 # --- What decisions live at the nft layer ---
 #
-# We deliberately DO NOT do per-outbound routing here (no c_T_v4/c_A_v4/...).
-# That was the pre-7f118eb design; it failed on CDN-shared IPs, e.g.
-# api.ipify.org landing in c_A_v4 via a Google-AI IP collision.
+# Default path: TPROXY everything into c-def-in:10813, let xray sniff the
+# domain (TLS SNI / HTTP Host / QUIC ClientHello) and pick the outbound.
+# This is the only reliable signal in a post-SNI-fronted, CDN-saturated
+# internet — the pre-7f118eb design routed by automated GeoIP-style sets
+# and broke on CDN collisions (api.ipify.org landed in c_A_v4 via a
+# Google-AI IP overlap).
 #
-# nft is the right place for decisions that are stable by IP alone:
+# nft owns decisions that are STABLE BY IP ALONE:
 #   - anti-loop (mark 0xff)
 #   - interface filter (only LAN-originated)
 #   - user-curated bypass (c_bypass_dst_v4, c_bypass_src_v4)
 #   - private / loopback / multicast destinations
+#   - user-curated per-outbound by IP (c_T_dst_v4, c_A_dst_v4) — opt-in,
+#     for apps that connect by IP without DNS (mobile media players,
+#     game-console binaries with hardcoded endpoints, app-pinned DC
+#     ranges). Guarded by a width filter in update-sets.sh
+#     (CLIENT_DST_MIN_PREFIX, default /24) — anything broader is rejected
+#     so a careless paste of a Cloudflare /12 cannot reintroduce the old
+#     CDN-collision bug.
 #
-# Everything else is TPROXY'd into c-def-in:10813 where xray makes the
-# outbound choice based on sniffed domain — the only reliable source of
-# truth in a post-SNI-fronted, CDN-saturated internet.
+# Everything not matched by the above falls through to c-def-in (domain
+# routing in xray/50-routing.json.tpl).
 #
 # --- Anti-loop ---
 #
@@ -61,6 +70,35 @@ table inet xray_clients {
     #
     set c_bypass_src_v4 {
         type ipv4_addr
+    }
+
+    # ---- per-outbound destination sets (NARROW IPs/CIDRs only) ----
+    #
+    # Populated by update-sets.sh from /etc/xray/lists/.../c-{T,A}-dst-v4.txt.
+    # Width-filtered: anything broader than CLIENT_DST_MIN_PREFIX (default
+    # /24) is dropped at staging time with a warning. This is defense-in-
+    # depth against the CDN-collision class of bug — pasting a Cloudflare
+    # /12 here would silently force half the internet through one outbound.
+    #
+    # Use cases (where xray domain routing cannot help):
+    #   - native apps with hardcoded IPs (no DNS query to sniff)
+    #   - mobile media players that pin streaming-DC IPs
+    #   - protocol stacks that keep one long-lived connection per session
+    #     (xray's per-flow domain decision is moot once the flow is open)
+    #
+    # NOT a substitute for xray domain rules. Add an entry only when you
+    # have evidence (xray-access.log + tcpdump) that a real flow misses
+    # the domain rule because there's no domain to sniff.
+    #
+    set c_T_dst_v4 {
+        type ipv4_addr
+        flags interval
+        auto-merge
+    }
+    set c_A_dst_v4 {
+        type ipv4_addr
+        flags interval
+        auto-merge
     }
 
     # ---- prerouting: the TPROXY hook ----
@@ -102,6 +140,24 @@ table inet xray_clients {
         ip6 daddr { ::1/128, fc00::/7, fe80::/10, ff00::/8 } \
             return comment "IPv6 local / link-local / multicast"
 
+        # 5c. Per-outbound by destination IP — TPROXY to a dedicated xray
+        #     inbound. xray (xray/50-routing.json.tpl) routes c-T-in -> T
+        #     and c-A-in -> A unconditionally; no domain sniff needed.
+        #     Order matters: T checked before A. If both lists contain
+        #     the same IP, T wins.
+        ip daddr @c_T_dst_v4 meta l4proto tcp tproxy to :10811 \
+            meta mark set 0x1 counter \
+            comment "TCP dst -> c-T-in (per-IP T)"
+        ip daddr @c_T_dst_v4 meta l4proto udp tproxy to :10811 \
+            meta mark set 0x1 counter \
+            comment "UDP dst -> c-T-in (per-IP T)"
+        ip daddr @c_A_dst_v4 meta l4proto tcp tproxy to :10812 \
+            meta mark set 0x1 counter \
+            comment "TCP dst -> c-A-in (per-IP A)"
+        ip daddr @c_A_dst_v4 meta l4proto udp tproxy to :10812 \
+            meta mark set 0x1 counter \
+            comment "UDP dst -> c-A-in (per-IP A)"
+
         # 6. TCP -> c-def-in. xray sniffs HTTP Host / TLS SNI, decides
         #    outbound by domain rule in xray/50-routing.json.tpl.
         meta l4proto tcp tproxy to :10813 meta mark set 0x1 counter \
@@ -121,5 +177,7 @@ table inet xray_clients {
         meta mark 0xff counter comment "xray-own (bypass)"
         ip daddr @c_bypass_dst_v4 counter comment "bypass dst hits"
         ip saddr @c_bypass_src_v4 counter comment "bypass src hits"
+        ip daddr @c_T_dst_v4 counter comment "per-IP T dst hits"
+        ip daddr @c_A_dst_v4 counter comment "per-IP A dst hits"
     }
 }

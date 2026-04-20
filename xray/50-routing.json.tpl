@@ -16,6 +16,18 @@
       },
 
       {
+        "_comment": "=== CLIENT-SIDE per-IP forced bindings (nft tproxy'd these) — no domain decision, outbound implicit by inbound ===",
+        "type": "field",
+        "inboundTag": ["c-T-in"],
+        "outboundTag": "T"
+      },
+      {
+        "type": "field",
+        "inboundTag": ["c-A-in"],
+        "outboundTag": "A"
+      },
+
+      {
         "_comment": "=== CLIENT-SIDE (c-def-in) — priority from most to least specific ===",
         "_comment_override_hint": "For per-device force-outbound, insert a rule ABOVE this block: { type: 'field', inboundTag: ['c-def-in'], source: ['192.168.1.50/32'], outboundTag: 'T' }. For per-device FULL bypass (skip xray), add the device IP to /etc/xray/lists/local/c-bypass-src-v4.txt — that's handled at nft level.",
         "_comment_1": "1. defense-in-depth: LAN/private never leaves via proxy",

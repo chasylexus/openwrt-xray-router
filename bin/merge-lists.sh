@@ -30,10 +30,16 @@ LISTS='
 r-T-ipv4.txt r-A-ipv4.txt
 r-T-domains.txt r-A-domains.txt
 c-bypass-dst-v4.txt c-bypass-src-v4.txt
+c-T-dst-v4.txt c-A-dst-v4.txt
 c-D-ipv4.txt c-T-ipv4.txt c-A-ipv4.txt
 c-D-domains.txt c-T-domains.txt c-A-domains.txt
 '
-# NOTE: c-D/c-T/c-A-{ipv4,domains}.txt are LEGACY (pre-7f118eb per-outbound
+# NOTE 1: c-T-dst-v4.txt / c-A-dst-v4.txt feed the per-IP forced-outbound
+# nft sets (c_T_dst_v4 / c_A_dst_v4). Width-filtered in update-sets.sh
+# (CLIENT_DST_MIN_PREFIX, default /24). Different namespace from the
+# legacy c-T-ipv4.txt / c-A-ipv4.txt below — do not confuse.
+#
+# NOTE 2: c-D/c-T/c-A-{ipv4,domains}.txt are LEGACY (pre-7f118eb per-outbound
 # nft sets). Kept in the merge list so existing local/remote overrides are
 # not silently dropped; nothing reads the merged output any more. Will be
 # removed in a later cleanup pass.

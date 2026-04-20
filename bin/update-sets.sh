@@ -108,6 +108,27 @@ parallel_resolve() {
     wait
 }
 
+# Width filter for client per-IP routing sets — drops any CIDR broader
+# than $CLIENT_DST_MIN_PREFIX (default /24). Bare /32 IPs always pass.
+# Rejected entries are warned to stderr; never abort. This is the
+# guardrail that prevents a careless paste of a CDN /12 from silently
+# routing half the internet through one outbound (the old pre-7f118eb
+# CDN-collision bug, just less subtle).
+narrow_filter() {
+    label="$1"
+    in="$2"
+    out="$3"
+    threshold="${CLIENT_DST_MIN_PREFIX:-24}"
+    awk -v t="$threshold" -v label="$label" '
+        /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ { print; next }
+        /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/[0-9]+$/ {
+            n = $0; sub(/.*\//, "", n)
+            if (n + 0 >= t + 0) { print; next }
+            printf "[update-sets][reject %s] CIDR %s broader than /%s\n", label, $0, t > "/dev/stderr"
+        }
+    ' "$in" > "$out"
+}
+
 # Build a staged file per set, source of truth: merged/*.txt
 stage_set() {
     set_table="$1"
@@ -146,17 +167,32 @@ write_resolver "$RESOLVER"
 PARALLEL="${RESOLVE_PARALLEL:-16}"
 log "resolving domains with parallelism=$PARALLEL (shell-native)"
 
-# NOTE: per-outbound client-side sets (c_D_v4 / c_T_v4 / c_A_v4) were
-# removed in 7f118eb — domain-based routing lives entirely in xray because
-# IP-level matching breaks on CDNs. The client-side bypass sets below are
-# safe because they only make "skip xray entirely" decisions; no
-# domain-to-outbound mapping happens at this layer.
+# NOTE on history: the original per-outbound client-side sets
+# (c_D_v4 / c_T_v4 / c_A_v4) were removed in 7f118eb because domain
+# resolution into them collided on CDNs (one IP, dozens of unrelated
+# services). The replacements below (c_T_dst_v4 / c_A_dst_v4) are a
+# different design:
+#   - IPs only, no domain resolution (so no CDN auto-population)
+#   - opt-in via /etc/xray/lists/local/c-{T,A}-dst-v4.txt
+#   - width-filtered by narrow_filter (CLIENT_DST_MIN_PREFIX, default /24)
+# The bypass sets remain "skip xray entirely" decisions and are unchanged.
 #
 # /dev/null as domain_file => IPs only, no resolve step.
 stage_set inet\ xray_router   r_T_v4           "$MERGED/r-T-ipv4.txt"         "$MERGED/r-T-domains.txt"   "$WORK/r_T_v4"
 stage_set inet\ xray_router   r_A_v4           "$MERGED/r-A-ipv4.txt"         "$MERGED/r-A-domains.txt"   "$WORK/r_A_v4"
 stage_set inet\ xray_clients  c_bypass_dst_v4  "$MERGED/c-bypass-dst-v4.txt"  /dev/null                   "$WORK/c_bypass_dst_v4"
 stage_set inet\ xray_clients  c_bypass_src_v4  "$MERGED/c-bypass-src-v4.txt"  /dev/null                   "$WORK/c_bypass_src_v4"
+
+# Per-IP forced outbound — IPs only (no domain resolution). Stage to a
+# .raw file, then narrow_filter to the final $WORK file. The empty-result
+# guard inside stage_set runs against .raw, so a list of all-broad CIDRs
+# passes stage_set and the filter just produces an empty final set —
+# which build_add then flushes-only. That's intentional: we never abort
+# the whole update because a user pasted bad data; we log + skip.
+stage_set inet\ xray_clients  c_T_dst_v4       "$MERGED/c-T-dst-v4.txt"       /dev/null                   "$WORK/c_T_dst_v4.raw"
+narrow_filter c_T_dst_v4 "$WORK/c_T_dst_v4.raw" "$WORK/c_T_dst_v4"
+stage_set inet\ xray_clients  c_A_dst_v4       "$MERGED/c-A-dst-v4.txt"       /dev/null                   "$WORK/c_A_dst_v4.raw"
+narrow_filter c_A_dst_v4 "$WORK/c_A_dst_v4.raw" "$WORK/c_A_dst_v4"
 
 # ------- step 3: validate: tables must exist ------------------------------
 nft list table inet xray_router  >/dev/null 2>&1 || die 'inet xray_router missing — run: /etc/init.d/xray reload'
@@ -178,12 +214,14 @@ snap_set() {
     snap_set xray_router   r_A_v4
     snap_set xray_clients  c_bypass_dst_v4
     snap_set xray_clients  c_bypass_src_v4
+    snap_set xray_clients  c_T_dst_v4
+    snap_set xray_clients  c_A_dst_v4
 } > "$LAST_GOOD.new.$$"
 mv "$LAST_GOOD.new.$$" "$LAST_GOOD"
 
 # ------- step 5: dry-run path -------------------------------------------
 if [ "$mode" = "--dry-run" ]; then
-    for s in r_T_v4 r_A_v4 c_bypass_dst_v4 c_bypass_src_v4; do
+    for s in r_T_v4 r_A_v4 c_bypass_dst_v4 c_bypass_src_v4 c_T_dst_v4 c_A_dst_v4; do
         [ -f "$WORK/$s" ] || continue
         n=$(wc -l < "$WORK/$s")
         log "$s would have $n elements"
@@ -234,13 +272,15 @@ build_add() {
     build_add xray_router   r_A_v4          "$WORK/r_A_v4"
     build_add xray_clients  c_bypass_dst_v4 "$WORK/c_bypass_dst_v4"
     build_add xray_clients  c_bypass_src_v4 "$WORK/c_bypass_src_v4"
+    build_add xray_clients  c_T_dst_v4      "$WORK/c_T_dst_v4"
+    build_add xray_clients  c_A_dst_v4      "$WORK/c_A_dst_v4"
 } > "$WORK/apply.nft"
 
 nft -c -f "$WORK/apply.nft" || die 'nft -c rejected the generated script'
 nft    -f "$WORK/apply.nft" || die 'nft -f failed during apply (state may be partial; last-good-sets.txt is safe)'
 
 # ------- step 7: done ----------------------------------------------------
-for s in r_T_v4 r_A_v4 c_bypass_dst_v4 c_bypass_src_v4; do
+for s in r_T_v4 r_A_v4 c_bypass_dst_v4 c_bypass_src_v4 c_T_dst_v4 c_A_dst_v4; do
     [ -f "$WORK/$s" ] || continue
     n=$(wc -l < "$WORK/$s" | awk '{print $1}')
     log "$s applied ($n elements)"

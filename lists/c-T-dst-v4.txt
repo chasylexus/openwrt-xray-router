@@ -1,0 +1,44 @@
+# c-T-dst-v4.txt
+# IPv4 destinations forced through the T outbound by destination IP.
+# Populated into nft set c_T_dst_v4; matched in xray_clients prerouting,
+# TPROXY'd to xray inbound c-T-in:10811, which routes unconditionally
+# to outbound T (xray/50-routing.json.tpl).
+#
+# --- When to use this (and not xray domain routing) ---
+#
+# Xray's domain routing is the right tool 95% of the time — it sniffs
+# TLS SNI / HTTP Host / QUIC ClientHello and decides per-flow. Use this
+# file ONLY when domain routing physically cannot help:
+#   - app connects directly by IP, never doing a DNS lookup
+#   - app pins one DC IP after first DNS and stays connected for hours
+#   - native binary with hardcoded endpoints (no SNI either, just IP)
+#
+# How to confirm a flow needs to live here:
+#   1. tail xray-access.log while reproducing the issue. If the flow
+#      shows up with the right domain and `routed -> T`, you don't need
+#      this file — fix domain routing instead.
+#   2. If the flow doesn't appear in xray-access.log at all, check
+#      `nft list table inet xray_clients` counters and tcpdump.
+#      If you see TCP/UDP SYN to a public IP that bypassed our hooks
+#      (private/multicast/etc returns) AND xray never saw it, then
+#      either it's IP-direct (this file's purpose) or it's QUIC pre-
+#      sniff (different problem).
+#
+# --- Width filter (defense-in-depth) ---
+#
+# update-sets.sh applies a width filter at staging:
+#   - bare IPs (1.2.3.4) always pass
+#   - CIDRs >= /CLIENT_DST_MIN_PREFIX pass (default /24)
+#   - CIDRs broader than /24 are dropped with a stderr warning
+# To override the threshold, set CLIENT_DST_MIN_PREFIX in
+# /etc/xray/secret.env (e.g. CLIENT_DST_MIN_PREFIX=20 to allow /20+).
+#
+# This guardrail prevents the CDN-collision bug: pasting a Cloudflare
+# /12 here would otherwise force half the internet through T.
+#
+# --- Format ---
+#
+# One IP or CIDR per line. # starts a comment. Empty lines ignored.
+# Examples (uncomment to enable):
+# 203.0.113.42                # mobile media player DC
+# 198.51.100.0/24             # game-console region cluster
