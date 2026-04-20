@@ -33,17 +33,22 @@ LAST_GOOD="$STATE/last-good-sets.txt"
 MERGER="$XRAY_ROOT/bin/merge-lists.sh"
 
 log() { printf '[update-sets] %s\n' "$*"; }
+warn() { printf '[update-sets][WARN] %s\n' "$*" >&2; }
 die() { printf '[update-sets][FATAL] %s\n' "$*" >&2; exit 1; }
 
 mkdir -p "$STATE"
 
 mode="${1:-normal}"
 
+restore_last_good() {
+    [ -r "$LAST_GOOD" ] || die "no last-good-sets.txt to restore from"
+    nft -f "$LAST_GOOD"
+}
+
 # ------- restore path ----------------------------------------------------
 if [ "$mode" = "--restore" ]; then
-    [ -r "$LAST_GOOD" ] || die "no last-good-sets.txt to restore from"
     log "restoring from $LAST_GOOD"
-    nft -f "$LAST_GOOD"
+    restore_last_good
     log 'restore OK'
     exit 0
 fi
@@ -277,7 +282,14 @@ build_add() {
 } > "$WORK/apply.nft"
 
 nft -c -f "$WORK/apply.nft" || die 'nft -c rejected the generated script'
-nft    -f "$WORK/apply.nft" || die 'nft -f failed during apply (state may be partial; last-good-sets.txt is safe)'
+if ! nft -f "$WORK/apply.nft"; then
+    warn 'nft -f failed; attempting automatic restore from last-good-sets.txt'
+    if restore_last_good; then
+        die 'nft -f failed; automatic restore succeeded, previous set contents restored'
+    else
+        die 'nft -f failed and automatic restore also failed; state may be partial'
+    fi
+fi
 
 # ------- step 7: done ----------------------------------------------------
 for s in r_T_v4 r_A_v4 c_bypass_dst_v4 c_bypass_src_v4 c_T_dst_v4 c_A_dst_v4; do

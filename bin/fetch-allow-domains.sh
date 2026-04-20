@@ -42,6 +42,54 @@ elif command -v wget >/dev/null 2>&1; then DL='wget -q -O'
 else die 'neither curl nor wget present'
 fi
 
+WORK=$(mktemp -d "$STATE/fetch-allow.XXXXXX") || die 'mktemp failed'
+BACKUP="$WORK/backup"
+trap 'rm -rf "$WORK"' EXIT INT TERM
+mkdir -p "$BACKUP"
+
+backup_once() {
+    name="$1"
+    dst="$R/allow-$name"
+    if [ -e "$BACKUP/$name" ] || [ -e "$BACKUP/$name.absent" ]; then
+        return 0
+    fi
+    if [ -e "$dst" ]; then
+        cp -p "$dst" "$BACKUP/$name"
+    else
+        : > "$BACKUP/$name.absent"
+    fi
+}
+
+restore_one() {
+    name="$1"
+    dst="$R/allow-$name"
+    if [ -e "$BACKUP/$name" ]; then
+        cp -p "$BACKUP/$name" "$dst"
+    else
+        rm -f "$dst"
+    fi
+}
+
+note_changed() {
+    name="$1"
+    case " $CHANGED " in
+        *" $name "*) : ;;
+        *) CHANGED="${CHANGED:+$CHANGED }$name" ;;
+    esac
+}
+
+rollback_allow_files() {
+    [ -n "${CHANGED:-}" ] || return 0
+    warn 'rolling allow-domain files back to previous versions'
+    for name in $CHANGED; do
+        restore_one "$name"
+    done
+    "$XRAY_ROOT/bin/merge-lists.sh" >/dev/null 2>&1 \
+        || warn 'merge-lists.sh failed while rebuilding merged lists after rollback'
+}
+
+CHANGED=""
+
 # pairs: <target-list-name> <path-suffix-relative-to-BASE>
 # All suffixes mapped to the same target are concatenated.
 ITEMS='
@@ -55,9 +103,10 @@ targets=$(echo "$ITEMS" | awk 'NF==2 {print $1}' | sort -u)
 
 for name in $targets; do
     dst="$R/allow-$name"
-    tmp="$R/.allow-$name.new.$$"
+    tmp="$WORK/allow-$name.new"
     : > "$tmp"
     any_ok=0
+    all_ok=1
     # All suffixes pointing at this target
     for suffix in $(echo "$ITEMS" | awk -v t="$name" 'NF==2 && $1==t {print $2}'); do
         url="$BASE/$suffix"
@@ -70,19 +119,25 @@ for name in $targets; do
             log "  fetched $suffix"
         else
             rm -f "$part"
+            all_ok=0
             warn "  fetch failed: $url"
         fi
     done
-    if [ "$any_ok" = 1 ] && [ -s "$tmp" ]; then
+    if [ "$all_ok" = 1 ] && [ "$any_ok" = 1 ] && [ -s "$tmp" ]; then
+        backup_once "$name"
         mv "$tmp" "$dst"
+        note_changed "$name"
         log "allow-$name: $(wc -l < "$dst" | awk '{print $1}') lines total"
     else
         rm -f "$tmp"
-        warn "all fetches failed for $name; keeping previous"
+        warn "one or more fetches failed for $name; keeping previous"
     fi
 done
 
-"$XRAY_ROOT/bin/update-sets.sh" || warn 'update-sets.sh failed; merged files may be stale'
+if ! "$XRAY_ROOT/bin/update-sets.sh"; then
+    rollback_allow_files
+    die 'update-sets.sh failed after allow-domain refresh; previous allow files restored'
+fi
 
 date +'%Y-%m-%dT%H:%M:%S%z' > "$STATE/last-fetch-allow-domains.txt"
 log 'OK'

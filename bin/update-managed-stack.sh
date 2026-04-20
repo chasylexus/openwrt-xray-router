@@ -84,7 +84,7 @@ if ! $DL "$stage/dnsmasq/90-nftset.conf.tpl" "$REPO_RAW/dnsmasq/90-nftset.conf.t
 fi
 
 log 'downloading managed helper scripts'
-for f in merge-lists.sh update-sets.sh update-managed-stack.sh; do
+for f in merge-lists.sh update-sets.sh update-managed-stack.sh update-assets.sh fetch-remote-lists.sh fetch-allow-domains.sh; do
     dl_bin "$f"
 done
 
@@ -179,7 +179,7 @@ else
     [ -e "$DNS_D/90-nftset.conf" ] && rm -f "$DNS_D/90-nftset.conf"
 fi
 
-for f in merge-lists.sh update-sets.sh update-managed-stack.sh; do
+for f in merge-lists.sh update-sets.sh update-managed-stack.sh update-assets.sh fetch-remote-lists.sh fetch-allow-domains.sh; do
     cp -p "$stage/bin/$f" "$XRAY_ROOT/bin/$f.new.$$"
     chmod 755 "$XRAY_ROOT/bin/$f.new.$$"
     mv "$XRAY_ROOT/bin/$f.new.$$" "$XRAY_ROOT/bin/$f"

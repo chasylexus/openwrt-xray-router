@@ -22,6 +22,7 @@ STATE="$XRAY_ROOT/state"
 CONF_DIR="$XRAY_ROOT/config.d"
 
 log() { printf '[update-assets] %s\n' "$*"; }
+warn() { printf '[update-assets][WARN] %s\n' "$*" >&2; }
 die() { printf '[update-assets][FATAL] %s\n' "$*" >&2; exit 1; }
 
 # shellcheck disable=SC1091
@@ -39,6 +40,8 @@ fi
 
 tmp=$(mktemp -d "$STATE/assets.XXXXXX") || die 'mktemp failed'
 trap 'rm -rf "$tmp"' EXIT INT TERM
+ROLLBACK="$tmp/rollback"
+mkdir -p "$ROLLBACK"
 
 log 'downloading geosite.dat'
 $DL "$tmp/geosite.dat" "$GEOSITE_URL" || die 'geosite download failed'
@@ -81,7 +84,36 @@ mkdir -p "$STATE/assets-backup"
 backup_one() {
     f="$1"
     if [ -e "$ASSET_DIR/$f" ]; then
+        cp -p "$ASSET_DIR/$f" "$ROLLBACK/$f"
         cp -p "$ASSET_DIR/$f" "$STATE/assets-backup/${f}.${ts}"
+    else
+        : > "$ROLLBACK/$f.absent"
+    fi
+}
+
+restore_one() {
+    f="$1"
+    if [ -e "$ROLLBACK/$f" ]; then
+        cp -p "$ROLLBACK/$f" "$ASSET_DIR/$f"
+    else
+        rm -f "$ASSET_DIR/$f"
+    fi
+}
+
+rollback_assets() {
+    warn 'restoring previous asset files'
+    restore_one geosite.dat
+    restore_one geoip.dat
+    if [ "$custom_new" = "1" ]; then
+        restore_one geosite-custom.dat
+    fi
+}
+
+validate_live_assets() {
+    if ls "$CONF_DIR"/*.json >/dev/null 2>&1; then
+        "$XRAY_BIN" -test -confdir "$CONF_DIR" > "$tmp/post-test.log" 2>&1
+    else
+        return 0
     fi
 }
 
@@ -102,8 +134,20 @@ if [ "$custom_new" = "1" ]; then
     mv "$tmp/geosite-custom.dat" "$ASSET_DIR/geosite-custom.dat"
 fi
 
+if ! validate_live_assets; then
+    cat "$tmp/post-test.log" >&2
+    rollback_assets
+    die 'post-install xray -test failed with live assets; previous asset files restored'
+fi
+
 # Ask procd to re-exec xray (gentle reload; procd handles it)
-/etc/init.d/xray reload >/dev/null 2>&1 || true
+if ! /etc/init.d/xray reload >/dev/null 2>&1; then
+    rollback_assets
+    if ! /etc/init.d/xray reload >/dev/null 2>&1; then
+        die 'xray reload failed and rollback reload also failed; previous asset files restored'
+    fi
+    die 'xray reload failed after asset update; previous asset files restored'
+fi
 
 date +'%Y-%m-%dT%H:%M:%S%z' > "$STATE/last-update-assets.txt"
 log 'OK'

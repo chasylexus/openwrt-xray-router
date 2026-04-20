@@ -31,6 +31,55 @@ elif command -v wget >/dev/null 2>&1; then DL='wget -q -O'
 else die 'neither curl nor wget present'
 fi
 
+WORK=$(mktemp -d "$STATE/fetch-remote.XXXXXX") || die 'mktemp failed'
+BACKUP="$WORK/backup"
+trap 'rm -rf "$WORK"' EXIT INT TERM
+mkdir -p "$BACKUP"
+
+backup_once() {
+    name="$1"
+    dst="$R/$name"
+    if [ -e "$BACKUP/$name" ] || [ -e "$BACKUP/$name.absent" ]; then
+        return 0
+    fi
+    if [ -e "$dst" ]; then
+        cp -p "$dst" "$BACKUP/$name"
+    else
+        : > "$BACKUP/$name.absent"
+    fi
+}
+
+restore_one() {
+    name="$1"
+    dst="$R/$name"
+    if [ -e "$BACKUP/$name" ]; then
+        cp -p "$BACKUP/$name" "$dst"
+    else
+        rm -f "$dst"
+    fi
+}
+
+note_changed() {
+    name="$1"
+    case " $CHANGED " in
+        *" $name "*) : ;;
+        *) CHANGED="${CHANGED:+$CHANGED }$name" ;;
+    esac
+}
+
+rollback_remote_files() {
+    [ -n "${CHANGED:-}" ] || return 0
+    warn 'rolling remote list files back to previous versions'
+    for name in $CHANGED; do
+        restore_one "$name"
+    done
+    "$XRAY_ROOT/bin/merge-lists.sh" >/dev/null 2>&1 \
+        || warn 'merge-lists.sh failed while rebuilding merged lists after rollback'
+}
+
+CHANGED=""
+FETCH_TAB="$WORK/fetch.tsv"
+
 # pairs: <filename> <env-var>
 FETCH='
 r-T-ipv4.txt    LISTS_R_T_IPV4_URL
@@ -46,26 +95,32 @@ c-A-domains.txt LISTS_C_A_DOMAINS_URL
 '
 
 # iterate pairs
-echo "$FETCH" | awk 'NF==2 {print $1"\t"$2}' | while IFS="	" read -r name var; do
+echo "$FETCH" | awk 'NF==2 {print $1"\t"$2}' > "$FETCH_TAB"
+while IFS="	" read -r name var; do
     eval "url=\${$var-}"
     dst="$R/$name"
     if [ -z "$url" ]; then
+        backup_once "$name"
         : > "$dst"
+        note_changed "$name"
         continue
     fi
-    tmp="$R/.${name}.new.$$"
+    tmp="$WORK/${name}.new"
     if $DL "$tmp" "$url"; then
+        backup_once "$name"
         mv "$tmp" "$dst"
+        note_changed "$name"
         log "fetched $name ($(wc -l < "$dst" | awk '{print $1}') lines)"
     else
         rm -f "$tmp"
         warn "download failed for $name ($url); keeping previous"
     fi
-done
+done < "$FETCH_TAB"
 
-# Kick off set refresh. If it fails, do not fail the whole run — remote list
-# download itself succeeded.
-"$XRAY_ROOT/bin/update-sets.sh" || warn 'update-sets.sh failed; merged files OK, sets may be stale'
+if ! "$XRAY_ROOT/bin/update-sets.sh"; then
+    rollback_remote_files
+    die 'update-sets.sh failed after remote refresh; previous remote files restored'
+fi
 
 date +'%Y-%m-%dT%H:%M:%S%z' > "$STATE/last-fetch-remote.txt"
 log 'OK'
