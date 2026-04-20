@@ -145,6 +145,22 @@ No uid/pid matching is used — it is fragile.
 
 Secrets never go to GitHub. `.gitignore` covers `secret.env` as a safeguard.
 
+### Repo-managed nft-stage IP lists
+
+`c-T-dst-v4.txt` and `c-A-dst-v4.txt` are special: they feed the nft
+`c_T_dst_v4` / `c_A_dst_v4` sets directly, so the packet is bound to outbound
+`T` or `A` at the nft stage before `c-def-in` reaches xray domain routing.
+
+If `LISTS_C_T_DST_V4_URL` / `LISTS_C_A_DST_V4_URL` are left unset and
+`REPO_RAW` is pinned, `fetch-remote-lists.sh` defaults them to:
+
+- `$REPO_RAW/lists/c-T-dst-v4.txt`
+- `$REPO_RAW/lists/c-A-dst-v4.txt`
+
+That enables the workflow: edit IP/CIDR lists in GitHub -> push -> router cron
+pulls from raw GitHub -> `update-sets.sh` safely rebuilds nft sets. Set a var
+to an explicit empty string to disable the repo-managed default for that file.
+
 ## First run (end-to-end)
 
 ### 1. Fork the repository and edit lists for your needs

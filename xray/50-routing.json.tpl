@@ -309,6 +309,7 @@
           "geosite:kinopub",
           "domain:kinopub.me",
           "domain:service-kp.com",
+          "domain:cdn32.lol",
           "domain:kinogo.biz",
           "domain:ottclub.tv",
           "domain:speedtest.net",

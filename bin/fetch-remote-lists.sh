@@ -9,7 +9,14 @@
 #   LISTS_R_T_IPV4_URL=...
 #   LISTS_R_T_DOMAINS_URL=...
 #   ...etc
-# Any variable that is empty or unset => that remote file is cleared.
+# Any variable that is set to an empty string => that remote file is cleared.
+#
+# Special case: per-IP forced-outbound lists for the nft stage can default to
+# the pinned repository when their vars are UNSET:
+#   LISTS_C_T_DST_V4_URL  -> $REPO_RAW/lists/c-T-dst-v4.txt
+#   LISTS_C_A_DST_V4_URL  -> $REPO_RAW/lists/c-A-dst-v4.txt
+# This keeps the "edit list in repo -> push -> cron pulls from raw GitHub"
+# workflow zero-touch on the router for nft-stage IP routing.
 
 set -eu
 
@@ -23,6 +30,8 @@ die()  { printf '[fetch-remote][FATAL] %s\n' "$*" >&2; exit 1; }
 
 # shellcheck disable=SC1091
 [ -r "$XRAY_ROOT/secret.env" ] && . "$XRAY_ROOT/secret.env"
+# shellcheck disable=SC1091
+[ -r "$XRAY_ROOT/repo.env" ] && . "$XRAY_ROOT/repo.env"
 
 mkdir -p "$R" "$STATE"
 
@@ -80,7 +89,42 @@ rollback_remote_files() {
 CHANGED=""
 FETCH_TAB="$WORK/fetch.tsv"
 
-# pairs: <filename> <env-var>
+repo_join() {
+    rel="$1"
+    printf '%s/%s\n' "${REPO_RAW%/}" "${rel#/}"
+}
+
+resolve_url() {
+    var="$1"
+    default_rel="${2:-}"
+
+    if eval "[ \"\${$var+x}\" = x ]"; then
+        eval "url=\${$var}"
+        [ -n "$url" ] || {
+            printf '\n'
+            return 0
+        }
+        case "$url" in
+            http://*|https://*)
+                printf '%s\n' "$url"
+                ;;
+            *)
+                [ -n "${REPO_RAW-}" ] || die "$var is relative but REPO_RAW is unset"
+                repo_join "$url"
+                ;;
+        esac
+        return 0
+    fi
+
+    if [ -n "$default_rel" ] && [ -n "${REPO_RAW-}" ]; then
+        repo_join "$default_rel"
+        return 0
+    fi
+
+    printf '\n'
+}
+
+# triples: <filename> <env-var> <repo-default-relative-path>
 FETCH='
 r-T-ipv4.txt    LISTS_R_T_IPV4_URL
 r-A-ipv4.txt    LISTS_R_A_IPV4_URL
@@ -92,12 +136,15 @@ c-A-ipv4.txt    LISTS_C_A_IPV4_URL
 c-D-domains.txt LISTS_C_D_DOMAINS_URL
 c-T-domains.txt LISTS_C_T_DOMAINS_URL
 c-A-domains.txt LISTS_C_A_DOMAINS_URL
+c-T-dst-v4.txt  LISTS_C_T_DST_V4_URL  lists/c-T-dst-v4.txt
+c-A-dst-v4.txt  LISTS_C_A_DST_V4_URL  lists/c-A-dst-v4.txt
 '
 
 # iterate pairs
-echo "$FETCH" | awk 'NF==2 {print $1"\t"$2}' > "$FETCH_TAB"
-while IFS="	" read -r name var; do
-    eval "url=\${$var-}"
+echo "$FETCH" | awk 'NF>=2 {print $1"\t"$2"\t"$3}' > "$FETCH_TAB"
+tab=$(printf '\t')
+while IFS="$tab" read -r name var default_rel; do
+    url=$(resolve_url "$var" "$default_rel")
     dst="$R/$name"
     if [ -z "$url" ]; then
         backup_once "$name"
