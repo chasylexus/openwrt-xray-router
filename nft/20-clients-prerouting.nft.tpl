@@ -145,17 +145,23 @@ table inet xray_clients {
         #     and c-A-in -> A unconditionally; no domain sniff needed.
         #     Order matters: T checked before A. If both lists contain
         #     the same IP, T wins.
+        #
+        #     IMPORTANT: these rules must terminate evaluation in this
+        #     base chain. `tproxy` itself is not a terminal verdict, so
+        #     without a final `accept` the packet falls through to the
+        #     generic c-def-in rule below and overwrites the dedicated
+        #     port selection.
         ip daddr @c_T_dst_v4 meta l4proto tcp tproxy ip to :10811 \
-            meta mark set 0x1 counter \
+            meta mark set 0x1 counter accept \
             comment "TCP dst -> c-T-in (per-IP T)"
         ip daddr @c_T_dst_v4 meta l4proto udp tproxy ip to :10811 \
-            meta mark set 0x1 counter \
+            meta mark set 0x1 counter accept \
             comment "UDP dst -> c-T-in (per-IP T)"
         ip daddr @c_A_dst_v4 meta l4proto tcp tproxy ip to :10812 \
-            meta mark set 0x1 counter \
+            meta mark set 0x1 counter accept \
             comment "TCP dst -> c-A-in (per-IP A)"
         ip daddr @c_A_dst_v4 meta l4proto udp tproxy ip to :10812 \
-            meta mark set 0x1 counter \
+            meta mark set 0x1 counter accept \
             comment "UDP dst -> c-A-in (per-IP A)"
 
         # 6. TCP -> c-def-in. xray sniffs HTTP Host / TLS SNI, decides
