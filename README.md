@@ -196,12 +196,26 @@ Fill in the URLs and T/A secrets.
 ### 4. First managed-apply
 
 ```sh
+/etc/xray/bin/update-all.sh
+```
+
+`update-all.sh` runs the full manual refresh chain in order:
+1. `update-managed-stack.sh`
+2. `update-assets.sh`
+3. `fetch-remote-lists.sh`
+4. `fetch-allow-domains.sh`
+5. `update-sets.sh`
+
+Each step must finish with `OK` and must not touch working state on error.
+
+If you want to debug a specific layer separately, the original manual sequence
+still works:
+
+```sh
 /etc/xray/bin/update-managed-stack.sh
 /etc/xray/bin/fetch-remote-lists.sh
 /etc/xray/bin/update-sets.sh
 ```
-
-Each should finish with `OK` and must not touch working state on error.
 
 ### 5. Start
 
@@ -275,6 +289,16 @@ Everything is orchestrated by cron (example in `examples/crontab.example`):
 - `fetch-allow-domains.sh` — every 6 hours: download allow-domains provider lists (no-op if `ALLOW_DOMAINS_BASE` is empty).
 - `update-sets.sh` — every 15–30 minutes: merge lists + resolve domains + atomic replace set content.
 - `cap-volatile-logs.sh` — every 10 minutes: trim `/tmp/xray-*.log` and `/tmp/xray-cron.log` in place to bounded size.
+
+For a manual "update everything now" run outside cron, use:
+
+```sh
+/etc/xray/bin/update-all.sh
+```
+
+It intentionally chains the slow/rare and fast/frequent layers so you do not
+end up in an intermediate state where Xray templates are new but nft sets are
+still based on older list content.
 
 All scripts are **staged/atomic**:
 1. Download to temp files.

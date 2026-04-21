@@ -83,6 +83,7 @@ apply-nft.sh
 run-xray.sh
 merge-lists.sh
 update-sets.sh
+update-all.sh
 update-assets.sh
 cap-volatile-logs.sh
 update-managed-stack.sh
@@ -173,7 +174,6 @@ log 'Next steps:'
 log '  1. cp /etc/xray/secret.env.example /etc/xray/secret.env'
 log '  2. vi /etc/xray/secret.env   # fill REPO_RAW (already pinned), LISTS_*_URL, T_* and A_*'
 log '  3. chmod 600 /etc/xray/secret.env'
-log '  4. /etc/xray/bin/update-managed-stack.sh'
-log '  5. /etc/xray/bin/fetch-remote-lists.sh   # optional, if you configured remote lists'
-log '  6. /etc/xray/bin/update-sets.sh'
+log '  4. /etc/xray/bin/update-all.sh'
+log '     # or run individual steps: update-managed-stack.sh / fetch-remote-lists.sh / update-sets.sh'
 log '  7. /etc/init.d/xray enable && /etc/init.d/xray start'
