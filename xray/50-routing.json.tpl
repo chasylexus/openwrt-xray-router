@@ -57,6 +57,30 @@
       },
 
       {
+        "_comment": "1c. WhatsApp domains before ads. Keeps chat/media flows from falling into geosite:category-ads-all false positives.",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "domain": [
+          "geosite:whatsapp",
+          "domain:whatsapp.com",
+          "domain:whatsapp.net",
+          "domain:whatsapp.biz",
+          "keyword:whatsapp"
+        ],
+        "outboundTag": "T"
+      },
+
+      {
+        "_comment": "1d. Narrow WhatsApp IP fallback before ads. Exact /32 observed from iPhone as repeated [c-def-in -> B] during app open.",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "ip": [
+          "157.240.253.60"
+        ],
+        "outboundTag": "T"
+      },
+
+      {
         "_comment": "2. ads (optional — reject before they can go anywhere)",
         "type": "field",
         "inboundTag": ["c-def-in"],

@@ -56,6 +56,12 @@
 # the likely Apple TV client during live reproduction. Kept as exact IPs
 # because these are CDN/shared-edge addresses and widening them to CIDR would
 # be much riskier than a targeted /32.
+#
+# WhatsApp iPhone follow-up (2026-04-22):
+# Exact /32 observed repeatedly as `[c-def-in -> B]` during app open. Kept
+# narrow here so nft can force only the confirmed Meta edge and leave other
+# shared/public infrastructure untouched.
+157.240.253.60
 104.21.12.188
 172.67.132.76
 104.20.46.132
