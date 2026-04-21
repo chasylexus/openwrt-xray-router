@@ -29,6 +29,11 @@ if [ -r "$env_file" ]; then
     . "$env_file"
 fi
 
+# Keep older installs rendering successfully if these optional fingerprint
+# vars are absent in secret.env. Routers that set T_FP/A_FP override these.
+: "${T_FP:=chrome}"
+: "${A_FP:=chrome}"
+
 # collect every __TOKEN__ in the template
 tokens=$(grep -oE '__[A-Z0-9_]+__' "$tpl" | sort -u || true)
 

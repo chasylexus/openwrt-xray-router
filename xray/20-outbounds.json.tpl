@@ -23,7 +23,7 @@
         "security": "reality",
         "realitySettings": {
           "serverName": "__T_SNI__",
-          "fingerprint": "chrome",
+          "fingerprint": "__T_FP__",
           "publicKey": "__T_PBK__",
           "shortId": "__T_SID__",
           "spiderX": ""
@@ -56,7 +56,7 @@
         "security": "reality",
         "realitySettings": {
           "serverName": "__A_SNI__",
-          "fingerprint": "chrome",
+          "fingerprint": "__A_FP__",
           "publicKey": "__A_PBK__",
           "shortId": "__A_SID__",
           "spiderX": ""

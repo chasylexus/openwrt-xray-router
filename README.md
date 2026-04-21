@@ -131,7 +131,7 @@ No uid/pid matching is used — it is fragile.
 
 ## What is edited locally (NOT committed)
 
-1. `/etc/xray/secret.env` — main secrets file. Format: shell env-file, safe for `. secret.env`. Contains template URLs, list URLs, asset URLs, UUID/PBK/SID/SNI/HOST for T and A.
+1. `/etc/xray/secret.env` — main secrets file. Format: shell env-file, safe for `. secret.env`. Contains template URLs, list URLs, asset URLs, UUID/PBK/SID/SNI/HOST/fingerprint for T and A.
 2. `/etc/xray/lists/local/*.txt` — your local domain/IP lists that supplement (or fully replace) remote ones.
 
 ## What is hosted on GitHub
