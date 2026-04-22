@@ -23,9 +23,18 @@ log()  { printf '[managed] %s\n' "$*"; }
 warn() { printf '[managed][WARN] %s\n' "$*" >&2; }
 die()  { printf '[managed][FATAL] %s\n' "$*" >&2; exit 1; }
 
-# shellcheck disable=SC1091
-. "$SELF_DIR/load-env.sh"
-xray_load_env
+if [ -r "$SELF_DIR/load-env.sh" ]; then
+    # shellcheck disable=SC1091
+    . "$SELF_DIR/load-env.sh"
+    xray_load_env
+else
+    # Compatibility fallback for older routers that updated helper scripts
+    # before load-env.sh existed in /etc/xray/bin.
+    [ -r "$XRAY_ROOT/repo.env" ] && . "$XRAY_ROOT/repo.env"
+    [ -r "$XRAY_ROOT/secret.env" ] && . "$XRAY_ROOT/secret.env"
+    : "${T_PORT:=443}"
+    : "${A_PORT:=443}"
+fi
 
 : "${REPO_RAW:?REPO_RAW not set (pinned in /etc/xray/repo.env)}"
 

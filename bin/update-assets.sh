@@ -26,9 +26,16 @@ log() { printf '[update-assets] %s\n' "$*"; }
 warn() { printf '[update-assets][WARN] %s\n' "$*" >&2; }
 die() { printf '[update-assets][FATAL] %s\n' "$*" >&2; exit 1; }
 
-# shellcheck disable=SC1091
-. "$SELF_DIR/load-env.sh"
-xray_load_env
+if [ -r "$SELF_DIR/load-env.sh" ]; then
+    # shellcheck disable=SC1091
+    . "$SELF_DIR/load-env.sh"
+    xray_load_env
+else
+    [ -r "$XRAY_ROOT/repo.env" ] && . "$XRAY_ROOT/repo.env"
+    [ -r "$XRAY_ROOT/secret.env" ] && . "$XRAY_ROOT/secret.env"
+    : "${T_PORT:=443}"
+    : "${A_PORT:=443}"
+fi
 
 : "${GEOSITE_URL:?GEOSITE_URL not set}"
 : "${GEOIP_URL:?GEOIP_URL not set}"

@@ -27,9 +27,16 @@ fi
 
 XRAY_SECRET_ENV_FILE="$env_file"
 XRAY_REPO_ENV_FILE="${XRAY_REPO_ENV_FILE:-$(dirname "$env_file")/repo.env}"
-# shellcheck disable=SC1091
-. "$SELF_DIR/load-env.sh"
-xray_load_env
+if [ -r "$SELF_DIR/load-env.sh" ]; then
+    # shellcheck disable=SC1091
+    . "$SELF_DIR/load-env.sh"
+    xray_load_env
+else
+    [ -r "$XRAY_REPO_ENV_FILE" ] && . "$XRAY_REPO_ENV_FILE"
+    [ -r "$XRAY_SECRET_ENV_FILE" ] && . "$XRAY_SECRET_ENV_FILE"
+    : "${T_PORT:=443}"
+    : "${A_PORT:=443}"
+fi
 
 # collect every __TOKEN__ in the template
 tokens=$(grep -oE '__[A-Z0-9_]+__' "$tpl" | sort -u || true)
