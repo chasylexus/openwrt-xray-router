@@ -15,6 +15,7 @@ www.google.com
 # blocks github raw)
 github.com
 raw.githubusercontent.com
+release-assets.githubusercontent.com
 objects.githubusercontent.com
 codeload.github.com
 
