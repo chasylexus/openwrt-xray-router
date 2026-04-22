@@ -12,9 +12,22 @@
 set -eu
 
 XRAY_ROOT="/etc/xray"
+SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 log()  { printf '[update-all] %s\n' "$*"; }
 die()  { printf '[update-all][FATAL] %s\n' "$*" >&2; exit 1; }
+
+# Preload/derive env once in the wrapper so an older installed child script can
+# still render newer templates during the self-update hop.
+if [ -r "$SELF_DIR/load-env.sh" ]; then
+    # shellcheck disable=SC1091
+    . "$SELF_DIR/load-env.sh"
+    xray_load_env
+fi
+
+: "${T_PORT:=443}"
+: "${A_PORT:=443}"
+export T_PORT A_PORT
 
 run_step() {
     name="$1"
