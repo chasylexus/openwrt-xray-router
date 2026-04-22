@@ -1,8 +1,8 @@
 #!/bin/sh
 # update-all.sh
 #
-# Manual "bring everything current" wrapper. Runs asset refresh first, then the
-# managed template/helper refresh, remote list refresh, allow-domain refresh,
+# Manual "bring everything current" wrapper. Runs the managed template/helper
+# refresh first, then asset refresh, remote list refresh, allow-domain refresh,
 # then a final update-sets pass so live nft sets end up aligned with whatever
 # changed.
 #
@@ -36,8 +36,8 @@ run_step() {
     "$@" || die "$name failed"
 }
 
-run_step update-assets        "$XRAY_ROOT/bin/update-assets.sh"
 run_step update-managed-stack "$XRAY_ROOT/bin/update-managed-stack.sh"
+run_step update-assets        "$XRAY_ROOT/bin/update-assets.sh"
 run_step fetch-remote-lists   "$XRAY_ROOT/bin/fetch-remote-lists.sh"
 run_step fetch-allow-domains  "$XRAY_ROOT/bin/fetch-allow-domains.sh"
 run_step update-sets          "$XRAY_ROOT/bin/update-sets.sh"
