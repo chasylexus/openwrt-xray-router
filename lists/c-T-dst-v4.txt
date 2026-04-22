@@ -62,6 +62,13 @@
 # narrow here so nft can force only the confirmed Meta edge and leave other
 # shared/public infrastructure untouched.
 157.240.253.60
+#
+# iTerm2 updater follow-up (2026-04-22):
+# Exact /32 Cloudflare edges observed repeatedly as `[c-def-in -> D]` during
+# update checks. Kept narrow because the service is domain-addressable and the
+# IPs are shared edges; these are only a defense-in-depth fallback for nft.
+104.21.68.5
+172.67.184.27
 104.21.12.188
 172.67.132.76
 104.20.46.132

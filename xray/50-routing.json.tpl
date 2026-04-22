@@ -81,6 +81,28 @@
       },
 
       {
+        "_comment": "1e. iTerm2 update/appcast domain -> T. Keeps the updater off the flaky direct path without widening unrelated traffic.",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "domain": [
+          "full:iterm2.com",
+          "domain:iterm2.com"
+        ],
+        "outboundTag": "T"
+      },
+
+      {
+        "_comment": "1f. Narrow iTerm2 IP fallback before ads. Exact Cloudflare /32s observed as repeated [c-def-in -> D] during update checks.",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "ip": [
+          "104.21.68.5",
+          "172.67.184.27"
+        ],
+        "outboundTag": "T"
+      },
+
+      {
         "_comment": "2. ads (optional — reject before they can go anywhere)",
         "type": "field",
         "inboundTag": ["c-def-in"],
