@@ -45,22 +45,26 @@ or `:10802` (→ `r-A-in` → outbound A). Everything else goes direct (system p
 
 ### Fallback (`c-def-in`)
 
-Xray routing `50-routing.json` for inbound `c-def-in`, evaluated top to bottom (first match wins):
-1. `geosite:category-ads-all` → `B` (block).
-2. `geosite:private`, `geosite:cn`, `geosite:geolocation-cn` → `D` (direct).
-3. `geoip:private`, `geoip:cn` → `D`.
-4. `geosite:geolocation-ru` → `D`.
-5. `geosite:apple` → `D`.
-6. `gemini.google.com`, `aistudio.google.com`, `generativelanguage.googleapis.com`, `bard.google.com`, `makersuite.google.com` → `A`.
-7. `geosite:netflix` → `A`.
-8. `geosite:openai`, `geosite:anthropic`, `geosite:category-ai-!cn` → `A`.
-9. `geosite:telegram` and `geoip:telegram` → `T`.
-10. `geosite:google` → `T`.
-11. `default` → `T`.
+Xray routing for inbound `c-def-in` is evaluated top to bottom (first match wins).
+The concrete service-to-outbound mapping changes over time and is intentionally
+**not** duplicated in this README.
 
-Rule 11 is a configurable safe default; change it in the template.
+Source of truth:
 
-Specific rules (like Gemini subdomains) must come **before** broader ones (like `geosite:google`) because xray evaluates rules in order. The nft layer cannot express this priority — it works on resolved IPs, which overlap for `google.com` and `gemini.google.com`. For fine-grained splits, rely on the xray layer.
+- [xray/50-routing.json.tpl](./xray/50-routing.json.tpl) — ordered routing rules
+- [lists/](./lists/) — static repo-managed list inputs
+
+Stable high-level shape:
+
+1. safety / captive-portal / direct-only exceptions
+2. ad blocking
+3. explicit service-family overrides (for example AI, streaming, big social)
+4. targeted IP fallbacks where domain routing cannot help
+5. final catch-all direct fallback
+
+Specific rules (for example a narrow subdomain override above a broad geosite)
+must stay above broader matches because xray evaluates rules in order. The nft
+layer cannot express that priority — it only sees resolved IPs.
 
 ### Anti-loop
 

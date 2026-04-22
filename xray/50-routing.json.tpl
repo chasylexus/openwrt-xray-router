@@ -231,6 +231,38 @@
       },
 
       {
+        "_comment": "4e. Explicit T suffix overrides that are not yet covered well enough by upstream geosite tags",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "domain": [
+          "domain:aistudiocdn.com",
+          "domain:character.ai",
+          "domain:deepl.com",
+          "domain:drawio.com",
+          "domain:fal.ai",
+          "domain:fal.media",
+          "domain:getoutline.com",
+          "domain:goog.le",
+          "domain:ifttt.com",
+          "domain:internalfb.com",
+          "domain:link.com",
+          "domain:linked.in",
+          "domain:mandrillapp.com",
+          "domain:musicgpt.com",
+          "domain:notion.com",
+          "domain:paypal.com",
+          "domain:pi.ai",
+          "domain:servarica.com",
+          "domain:smallstep.com",
+          "domain:sora.ai",
+          "domain:udio.com",
+          "domain:workos.com",
+          "domain:you.com"
+        ],
+        "outboundTag": "T"
+      },
+
+      {
         "_comment": "5a. Big social / media / search via geosite -> T",
         "type": "field",
         "inboundTag": ["c-def-in"],
