@@ -6,6 +6,14 @@ with fallback through Xray routing by domain / geosite / geoip.
 
 Designed for set-and-forget deployment: safe bootstrap ensure → optional `--force-init` → cron → atomic updates → rollback on any validation error.
 
+`REPO_RAW` in this README means the base raw URL of your GitHub repo branch, for example:
+
+```text
+https://raw.githubusercontent.com/chasylexus/openwrt-xray-router/main
+```
+
+Bootstrap uses `REPO_RAW` to fetch only repo-tracked files: helper scripts, templates, starter lists, and `secret.env.example`.
+
 ## Platform
 
 - OpenWrt 25.12.2 (r32802+), BusyBox ash v1.37+
@@ -171,7 +179,22 @@ to an explicit empty string to disable the repo-managed default for that file.
 
 You can also start with the default examples.
 
-### 2. On the router, as root:
+### 2. On a new router, as root
+
+Preferred path for a fresh router:
+
+```sh
+export REPO_RAW='https://raw.githubusercontent.com/<you>/<repo>/main'
+uclient-fetch -O /tmp/bootstrap.sh "$REPO_RAW/bootstrap/bootstrap-xray-v2.sh" \
+  || wget -O /tmp/bootstrap.sh "$REPO_RAW/bootstrap/bootstrap-xray-v2.sh"
+sh /tmp/bootstrap.sh --force-init "$REPO_RAW"
+```
+
+That path is intentionally split in two network phases:
+- Phase 1 uses `REPO_RAW` first. bootstrap pulls repo files, can prompt for `REPO_RAW` and `T_VLESS_URL` / `A_VLESS_URL`, writes `secret.env`, and prepares the managed stack.
+- Phase 2 touches OpenWrt package feeds only when needed. If the router already has the critical pre-route tools (`nft`, `ip`, `uci`, `xray`, downloader), bootstrap defers package feeds until after routing is up. If one of those critical pieces is missing, feed access becomes unavoidable before routing.
+
+### 3. On the router, as root:
 
 ```sh
 # replace URL with your fork
@@ -180,21 +203,34 @@ wget -O /tmp/bootstrap.sh "$REPO_RAW/bootstrap/bootstrap-xray-v2.sh"
 sh /tmp/bootstrap.sh "$REPO_RAW"
 ```
 
+You can also omit the argument entirely in an interactive shell:
+
+```sh
+wget -O /tmp/bootstrap.sh 'https://raw.githubusercontent.com/<owner>/<repo>/<branch>/bootstrap/bootstrap-xray-v2.sh'
+sh /tmp/bootstrap.sh
+```
+
+In that mode bootstrap asks for:
+- `REPO_RAW` with an example of the expected raw URL format, and normalizes a trailing slash if present
+- `T_VLESS_URL` and `A_VLESS_URL` with neutral examples; pressing Enter on `A_VLESS_URL` reuses `T_VLESS_URL`
+
 Bootstrap will:
 - create `/etc/xray/{config.d,nft.d,lists/{local,remote,merged},templates,state,bin,dnsmasq.d}`;
 - download helper scripts to `/etc/xray/bin/`;
 - install `/etc/init.d/xray`;
 - install the managed Xray cron block when that is safe;
+- if interactive and `secret.env` is missing/incomplete — offer to create/fill it with `T_VLESS_URL` / `A_VLESS_URL`;
+- prefer `REPO_RAW` downloads first and postpone OpenWrt package feeds until the last responsible moment;
 - **not** force-render or restart Xray in default ensure mode;
 - if `secret.env` is absent — place `/etc/xray/secret.env.example` alongside it and print instructions.
 
-### 3. Bootstrap modes
+### 4. Bootstrap modes
 
 - Default mode is safe `ensure`: refresh managed files, keep local secrets/lists, install the managed cron block when that does not conflict with legacy cron lines, and stop there.
-- `--force-init` is the "make it ready" mode: after the same safe bootstrap steps it runs `update-all.sh`, enables `xray`, and starts it if `secret.env` is already complete.
+- `--force-init` is the "make it ready" mode: after the same safe bootstrap steps it installs only the critical missing pre-route packages if they are absent, runs `update-all.sh`, enables `xray`, starts it, and only then installs/verifies the remaining post-route packages such as `dnsmasq-full`.
 - If legacy `/etc/xray/bin/...` cron lines exist outside the managed block, default mode warns and leaves them alone; `--force-init` migrates them into the managed block automatically.
 
-### 4. Create `/etc/xray/secret.env`
+### 5. Create `/etc/xray/secret.env`
 
 ```sh
 cp /etc/xray/secret.env.example /etc/xray/secret.env
@@ -210,7 +246,7 @@ You can either:
 
 When a `*_VLESS_URL` variable is set, it takes precedence. The parser is intentionally strict and only accepts the VLESS+Reality-over-TCP shape that this repo renders; unsupported share links fail closed instead of producing a half-wrong config.
 
-### 5. First managed-apply
+### 6. First managed-apply
 
 Once `secret.env` is filled, the preferred one-shot path is:
 
@@ -244,14 +280,14 @@ still works:
 /etc/xray/bin/update-sets.sh
 ```
 
-### 6. Start
+### 7. Start
 
 ```sh
 /etc/init.d/xray enable
 /etc/init.d/xray start
 ```
 
-### 7. Verify
+### 8. Verify
 
 ```sh
 # Xray is alive

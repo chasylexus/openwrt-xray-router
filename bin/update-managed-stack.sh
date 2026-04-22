@@ -31,7 +31,8 @@ xray_load_env
 
 if command -v curl >/dev/null 2>&1; then DL='curl -fsSL -o'
 elif command -v wget >/dev/null 2>&1; then DL='wget -q -O'
-else die 'neither curl nor wget present'
+elif command -v uclient-fetch >/dev/null 2>&1; then DL='uclient-fetch -O'
+else die 'no downloader present (curl, wget, uclient-fetch)'
 fi
 
 mkdir -p "$STATE" "$TPL_DIR/xray" "$TPL_DIR/nft" "$TPL_DIR/dnsmasq"
