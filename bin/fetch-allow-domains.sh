@@ -46,9 +46,9 @@ BASE="${BASE%/}"
 
 mkdir -p "$R" "$STATE"
 
-if command -v curl >/dev/null 2>&1; then DL='curl -fsSL -o'
-elif command -v wget >/dev/null 2>&1; then DL='wget -q -O'
-elif command -v uclient-fetch >/dev/null 2>&1; then DL='uclient-fetch -O'
+if command -v curl >/dev/null 2>&1; then DL='curl -4 -fsSL -o'
+elif command -v wget >/dev/null 2>&1; then DL='wget -4 -q -O'
+elif command -v uclient-fetch >/dev/null 2>&1; then DL='uclient-fetch -4 -O'
 else die 'no downloader present (curl, wget, uclient-fetch)'
 fi
 

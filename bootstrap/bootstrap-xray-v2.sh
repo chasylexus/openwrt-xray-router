@@ -248,15 +248,15 @@ xray_binary_present() {
 
 pick_downloader() {
     if command -v curl >/dev/null 2>&1; then
-        DL='curl -fsSL -o'
+        DL='curl -4 -fsSL -o'
         return 0
     fi
     if command -v wget >/dev/null 2>&1; then
-        DL='wget -q -O'
+        DL='wget -4 -q -O'
         return 0
     fi
     if command -v uclient-fetch >/dev/null 2>&1; then
-        DL='uclient-fetch -O'
+        DL='uclient-fetch -4 -O'
         return 0
     fi
     return 1
