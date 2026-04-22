@@ -16,17 +16,16 @@ CONF_D="$XRAY_ROOT/config.d"
 NFT_D="$XRAY_ROOT/nft.d"
 DNS_D="$XRAY_ROOT/dnsmasq.d"
 STATE="$XRAY_ROOT/state"
-RENDER="$XRAY_ROOT/bin/render-template.sh"
 XRAY_BIN="/usr/local/xray/xray"
+SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 log()  { printf '[managed] %s\n' "$*"; }
 warn() { printf '[managed][WARN] %s\n' "$*" >&2; }
 die()  { printf '[managed][FATAL] %s\n' "$*" >&2; exit 1; }
 
 # shellcheck disable=SC1091
-[ -r "$XRAY_ROOT/secret.env" ] && . "$XRAY_ROOT/secret.env"
-# shellcheck disable=SC1091
-[ -r "$XRAY_ROOT/repo.env"   ] && . "$XRAY_ROOT/repo.env"
+. "$SELF_DIR/load-env.sh"
+xray_load_env
 
 : "${REPO_RAW:?REPO_RAW not set (pinned in /etc/xray/repo.env)}"
 
@@ -58,6 +57,7 @@ dl_bin() {
     $DL "$stage/bin/$fname" "$url" || die "download failed: $url"
     [ -s "$stage/bin/$fname" ]     || die "empty helper: $fname"
     head -1 "$stage/bin/$fname" | grep -q '^#!' || die "not a shell script: $fname"
+    chmod 755 "$stage/bin/$fname"
 }
 
 dl_list_seed() {
@@ -84,7 +84,7 @@ if ! $DL "$stage/dnsmasq/90-nftset.conf.tpl" "$REPO_RAW/dnsmasq/90-nftset.conf.t
 fi
 
 log 'downloading managed helper scripts'
-for f in merge-lists.sh update-sets.sh update-managed-stack.sh update-all.sh update-assets.sh fetch-remote-lists.sh fetch-allow-domains.sh cap-volatile-logs.sh; do
+for f in render-template.sh load-env.sh ensure-crontab.sh apply-iprules.sh apply-nft.sh run-xray.sh merge-lists.sh update-sets.sh update-managed-stack.sh update-all.sh update-assets.sh fetch-remote-lists.sh fetch-allow-domains.sh cap-volatile-logs.sh; do
     dl_bin "$f"
 done
 
@@ -106,6 +106,7 @@ render_dir() {
 }
 
 log 'rendering'
+RENDER="$stage/bin/render-template.sh"
 render_dir xray    config.d  json.tpl  json
 render_dir nft     nft.d     nft.tpl   nft
 # dnsmasq: only if template is non-empty
@@ -179,7 +180,7 @@ else
     [ -e "$DNS_D/90-nftset.conf" ] && rm -f "$DNS_D/90-nftset.conf"
 fi
 
-for f in merge-lists.sh update-sets.sh update-managed-stack.sh update-all.sh update-assets.sh fetch-remote-lists.sh fetch-allow-domains.sh cap-volatile-logs.sh; do
+for f in render-template.sh load-env.sh ensure-crontab.sh apply-iprules.sh apply-nft.sh run-xray.sh merge-lists.sh update-sets.sh update-managed-stack.sh update-all.sh update-assets.sh fetch-remote-lists.sh fetch-allow-domains.sh cap-volatile-logs.sh; do
     cp -p "$stage/bin/$f" "$XRAY_ROOT/bin/$f.new.$$"
     chmod 755 "$XRAY_ROOT/bin/$f.new.$$"
     mv "$XRAY_ROOT/bin/$f.new.$$" "$XRAY_ROOT/bin/$f"

@@ -20,15 +20,15 @@ ASSET_DIR="/usr/local/xray"
 XRAY_BIN="/usr/local/xray/xray"
 STATE="$XRAY_ROOT/state"
 CONF_DIR="$XRAY_ROOT/config.d"
+SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 log() { printf '[update-assets] %s\n' "$*"; }
 warn() { printf '[update-assets][WARN] %s\n' "$*" >&2; }
 die() { printf '[update-assets][FATAL] %s\n' "$*" >&2; exit 1; }
 
 # shellcheck disable=SC1091
-[ -r "$XRAY_ROOT/secret.env" ] && . "$XRAY_ROOT/secret.env"
-# shellcheck disable=SC1091
-[ -r "$XRAY_ROOT/repo.env"   ] && . "$XRAY_ROOT/repo.env"
+. "$SELF_DIR/load-env.sh"
+xray_load_env
 
 : "${GEOSITE_URL:?GEOSITE_URL not set}"
 : "${GEOIP_URL:?GEOIP_URL not set}"

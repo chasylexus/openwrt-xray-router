@@ -1,6 +1,7 @@
 # /etc/crontabs/root
 #
-# Add to /etc/crontabs/root and run: /etc/init.d/cron reload
+# Reference only. bootstrap installs the same managed block automatically.
+# To re-install it safely later, run: /etc/xray/bin/ensure-crontab.sh --install --reload
 #
 # Schedule rationale:
 #   update-sets        — fast, cheap, safe; tightest schedule to keep IPs fresh

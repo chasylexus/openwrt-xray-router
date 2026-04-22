@@ -7,7 +7,7 @@
         "vnext": [
           {
             "address": "__T_HOST__",
-            "port": 443,
+            "port": __T_PORT__,
             "users": [
               {
                 "id": "__T_UUID__",
@@ -40,7 +40,7 @@
         "vnext": [
           {
             "address": "__A_HOST__",
-            "port": 443,
+            "port": __A_PORT__,
             "users": [
               {
                 "id": "__A_UUID__",

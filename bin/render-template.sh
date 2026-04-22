@@ -17,6 +17,7 @@ set -eu
 
 tpl="${1:-}"
 env_file="${2:-/etc/xray/secret.env}"
+SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 if [ -z "$tpl" ] || [ ! -r "$tpl" ]; then
     echo "usage: $0 <template> [env-file]" >&2
@@ -24,15 +25,11 @@ if [ -z "$tpl" ] || [ ! -r "$tpl" ]; then
     exit 2
 fi
 
-if [ -r "$env_file" ]; then
-    # shellcheck disable=SC1090
-    . "$env_file"
-fi
-
-# Keep older installs rendering successfully if these optional fingerprint
-# vars are absent in secret.env. Routers that set T_FP/A_FP override these.
-: "${T_FP:=chrome}"
-: "${A_FP:=chrome}"
+XRAY_SECRET_ENV_FILE="$env_file"
+XRAY_REPO_ENV_FILE="${XRAY_REPO_ENV_FILE:-$(dirname "$env_file")/repo.env}"
+# shellcheck disable=SC1091
+. "$SELF_DIR/load-env.sh"
+xray_load_env
 
 # collect every __TOKEN__ in the template
 tokens=$(grep -oE '__[A-Z0-9_]+__' "$tpl" | sort -u || true)

@@ -20,13 +20,15 @@ set -eu
 XRAY_ROOT="/etc/xray"
 R="$XRAY_ROOT/lists/remote"
 STATE="$XRAY_ROOT/state"
+SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 log()  { printf '[fetch-allow] %s\n' "$*"; }
 warn() { printf '[fetch-allow][WARN] %s\n' "$*" >&2; }
 die()  { printf '[fetch-allow][FATAL] %s\n' "$*" >&2; exit 1; }
 
 # shellcheck disable=SC1091
-[ -r "$XRAY_ROOT/secret.env" ] && . "$XRAY_ROOT/secret.env"
+. "$SELF_DIR/load-env.sh"
+xray_load_env
 
 BASE="${ALLOW_DOMAINS_BASE-}"
 if [ -z "$BASE" ]; then

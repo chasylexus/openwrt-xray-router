@@ -9,9 +9,11 @@ set -eu
 
 XRAY_ROOT="/etc/xray"
 STATE="$XRAY_ROOT/state"
+SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 # shellcheck disable=SC1091
-[ -r "$XRAY_ROOT/secret.env" ] && . "$XRAY_ROOT/secret.env"
+. "$SELF_DIR/load-env.sh"
+xray_load_env
 
 ACCESS_MAX="${XRAY_ACCESS_LOG_MAX_BYTES:-16777216}"
 ACCESS_KEEP="${XRAY_ACCESS_LOG_KEEP_BYTES:-8388608}"

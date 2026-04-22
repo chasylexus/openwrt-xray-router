@@ -1,24 +1,56 @@
 #!/bin/sh
 # bootstrap-xray-v2.sh
 #
-# Устанавливает структуру /etc/xray, скачивает helper-скрипты, кладёт init.d/xray.
-# НЕ стартует Xray — только подготовка. Первый старт — вручную после заполнения secret.env.
+# Устанавливает/обновляет managed-структуру /etc/xray, скачивает helper-скрипты,
+# ставит init.d/xray и managed cron block. По умолчанию работает в безопасном
+# ensure-режиме: ничего не ломает на уже настроенном роутере и не делает
+# принудительный full apply. Флаг --force-init запускает полный bootstrap/apply
+# после того как secret.env уже готов.
 #
 # Usage:
-#   sh bootstrap-xray-v2.sh <REPO_RAW_URL>
+#   sh bootstrap-xray-v2.sh [--force-init] <REPO_RAW_URL>
 #
 # REPO_RAW_URL — базовый URL до raw-файлов репозитория, например:
 #   https://raw.githubusercontent.com/you/openwrt-xray-router/main
 #
-# Идемпотентен: повторный запуск перезаписывает helpers и init.d/xray, но не трогает secret.env и lists/local.
+# Идемпотентен: повторный запуск обновляет managed-файлы, но не трогает
+# secret.env и lists/local.
 
 set -eu
 
-REPO_RAW="${1:-}"
-if [ -z "$REPO_RAW" ]; then
-    echo "usage: $0 <REPO_RAW_URL>" >&2
+MODE="ensure"
+REPO_RAW=""
+
+usage() {
+    echo "usage: $0 [--force-init] <REPO_RAW_URL>" >&2
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --force-init) MODE="force-init" ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -*)
+            usage
+            exit 2
+            ;;
+        *)
+            [ -z "$REPO_RAW" ] || {
+                usage
+                exit 2
+            }
+            REPO_RAW=$1
+            ;;
+    esac
+    shift
+done
+
+[ -n "$REPO_RAW" ] || {
+    usage
     exit 2
-fi
+}
 
 XRAY_ROOT="/etc/xray"
 INITD="/etc/init.d/xray"
@@ -78,6 +110,8 @@ chmod 700 "$XRAY_ROOT/state"
 
 BIN_FILES='
 render-template.sh
+load-env.sh
+ensure-crontab.sh
 apply-iprules.sh
 apply-nft.sh
 run-xray.sh
@@ -167,13 +201,71 @@ fi
 
 # ------- 9. done ---------------------------------------------------------
 
+log 'ensuring cron service'
+if [ -x /etc/init.d/cron ]; then
+    /etc/init.d/cron enable >/dev/null 2>&1 || log 'WARN: failed to enable cron'
+    /etc/init.d/cron start  >/dev/null 2>&1 || true
+else
+    log 'WARN: /etc/init.d/cron missing; cron not enabled'
+fi
+
+log 'ensuring managed cron block'
+if [ "$MODE" = "force-init" ]; then
+    if ! "$XRAY_ROOT/bin/ensure-crontab.sh" --migrate --reload; then
+        die 'failed to migrate/install managed cron block'
+    fi
+else
+    if ! "$XRAY_ROOT/bin/ensure-crontab.sh" --install --reload; then
+        log 'WARN: managed cron block not auto-installed (likely legacy xray cron lines exist outside the managed block)'
+        log 'WARN: rerun with --force-init to migrate those lines automatically'
+    fi
+fi
+
+secret_ready=0
+if [ -r "$XRAY_ROOT/secret.env" ]; then
+    # shellcheck disable=SC1091
+    . "$XRAY_ROOT/bin/load-env.sh"
+    if xray_load_env >/dev/null 2>&1 && xray_env_stack_ready >/dev/null 2>&1; then
+        secret_ready=1
+    else
+        log 'secret.env exists, but is not yet complete/valid for full apply'
+    fi
+else
+    log 'secret.env missing (normal on first bootstrap)'
+fi
+
 log ''
-log 'bootstrap OK'
+log "bootstrap ${MODE} OK"
+
+if [ "$MODE" = "force-init" ]; then
+    if [ "$secret_ready" -eq 1 ]; then
+        log 'running full initialization chain'
+        "$XRAY_ROOT/bin/update-all.sh" || die 'update-all failed'
+        /etc/init.d/xray enable >/dev/null 2>&1 || log 'WARN: failed to enable xray service'
+        if ! /etc/init.d/xray status >/dev/null 2>&1; then
+            /etc/init.d/xray start >/dev/null 2>&1 || die 'xray start failed after force-init'
+        fi
+        log 'force-init completed: config rendered, lists fetched, assets checked, service ready'
+        exit 0
+    fi
+
+    log 'managed files and cron are ready, but full apply was skipped until secret.env is complete'
+    log 'Fill /etc/xray/secret.env and rerun the same --force-init command'
+    exit 0
+fi
+
 log ''
-log 'Next steps:'
-log '  1. cp /etc/xray/secret.env.example /etc/xray/secret.env'
-log '  2. vi /etc/xray/secret.env   # fill REPO_RAW (already pinned), LISTS_*_URL, T_* and A_*'
-log '  3. chmod 600 /etc/xray/secret.env'
-log '  4. /etc/xray/bin/update-all.sh'
-log '     # or run individual steps: update-managed-stack.sh / fetch-remote-lists.sh / update-sets.sh'
-log '  7. /etc/init.d/xray enable && /etc/init.d/xray start'
+log 'Ensure mode summary:'
+log '  - managed files refreshed'
+log '  - repo.env pinned'
+log '  - managed cron block installed when safe'
+log '  - no forced xray apply/start was performed'
+if [ "$secret_ready" -eq 1 ]; then
+    log 'secret.env already looks complete; rerun with --force-init if you want bootstrap to render/apply/start automatically'
+else
+    log 'Next steps:'
+    log '  1. cp /etc/xray/secret.env.example /etc/xray/secret.env'
+    log '  2. vi /etc/xray/secret.env   # fill GEOSITE/GEOIP URLs and either T_VLESS_URL/A_VLESS_URL or split T_*/A_* vars'
+    log '  3. chmod 600 /etc/xray/secret.env'
+    log '  4. rerun bootstrap with --force-init'
+fi

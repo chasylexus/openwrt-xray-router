@@ -4,7 +4,7 @@ Production-grade setup for an OpenWrt router with dual-circuit policy routing vi
 separate handling for the router itself (OUTPUT hook) and for LAN clients (PREROUTING hook),
 with fallback through Xray routing by domain / geosite / geoip.
 
-Designed for set-and-forget deployment: bootstrap → cron → atomic updates → rollback on any validation error.
+Designed for set-and-forget deployment: safe bootstrap ensure → optional `--force-init` → cron → atomic updates → rollback on any validation error.
 
 ## Platform
 
@@ -135,7 +135,7 @@ No uid/pid matching is used — it is fragile.
 
 ## What is edited locally (NOT committed)
 
-1. `/etc/xray/secret.env` — main secrets file. Format: shell env-file, safe for `. secret.env`. Contains template URLs, list URLs, asset URLs, UUID/PBK/SID/SNI/HOST/fingerprint for T and A.
+1. `/etc/xray/secret.env` — main secrets file. Format: shell env-file, safe for `. secret.env`. Contains template URLs, list URLs, asset URLs, and either full `T_VLESS_URL` / `A_VLESS_URL` share links or split UUID/PBK/SID/SNI/HOST/PORT/fingerprint fields for T and A.
 2. `/etc/xray/lists/local/*.txt` — your local domain/IP lists that supplement (or fully replace) remote ones.
 
 ## What is hosted on GitHub
@@ -184,10 +184,17 @@ Bootstrap will:
 - create `/etc/xray/{config.d,nft.d,lists/{local,remote,merged},templates,state,bin,dnsmasq.d}`;
 - download helper scripts to `/etc/xray/bin/`;
 - install `/etc/init.d/xray`;
-- **not** start the service;
+- install the managed Xray cron block when that is safe;
+- **not** force-render or restart Xray in default ensure mode;
 - if `secret.env` is absent — place `/etc/xray/secret.env.example` alongside it and print instructions.
 
-### 3. Create `/etc/xray/secret.env`
+### 3. Bootstrap modes
+
+- Default mode is safe `ensure`: refresh managed files, keep local secrets/lists, install the managed cron block when that does not conflict with legacy cron lines, and stop there.
+- `--force-init` is the "make it ready" mode: after the same safe bootstrap steps it runs `update-all.sh`, enables `xray`, and starts it if `secret.env` is already complete.
+- If legacy `/etc/xray/bin/...` cron lines exist outside the managed block, default mode warns and leaves them alone; `--force-init` migrates them into the managed block automatically.
+
+### 4. Create `/etc/xray/secret.env`
 
 ```sh
 cp /etc/xray/secret.env.example /etc/xray/secret.env
@@ -195,17 +202,33 @@ vi /etc/xray/secret.env
 chmod 600 /etc/xray/secret.env
 ```
 
-Fill in the URLs and T/A secrets.
+Fill in the URLs and T/A connection details.
 
-### 4. First managed-apply
+You can either:
+- paste full `T_VLESS_URL` / `A_VLESS_URL` links, or
+- keep using split `T_HOST`, `T_PORT`, `T_UUID`, `T_SNI`, `T_FP`, `T_PBK`, `T_SID` and the matching `A_*` variables.
+
+When a `*_VLESS_URL` variable is set, it takes precedence. The parser is intentionally strict and only accepts the VLESS+Reality-over-TCP shape that this repo renders; unsupported share links fail closed instead of producing a half-wrong config.
+
+### 5. First managed-apply
+
+Once `secret.env` is filled, the preferred one-shot path is:
+
+```sh
+sh /tmp/bootstrap.sh --force-init "$REPO_RAW"
+```
+
+That reruns the safe bootstrap steps, migrates/install the managed cron block, performs the full staged apply chain, and starts `xray` if needed.
+
+Manual apply still works too:
 
 ```sh
 /etc/xray/bin/update-all.sh
 ```
 
 `update-all.sh` runs the full manual refresh chain in order:
-1. `update-managed-stack.sh`
-2. `update-assets.sh`
+1. `update-assets.sh`
+2. `update-managed-stack.sh`
 3. `fetch-remote-lists.sh`
 4. `fetch-allow-domains.sh`
 5. `update-sets.sh`
@@ -221,14 +244,14 @@ still works:
 /etc/xray/bin/update-sets.sh
 ```
 
-### 5. Start
+### 6. Start
 
 ```sh
 /etc/init.d/xray enable
 /etc/init.d/xray start
 ```
 
-### 6. Verify
+### 7. Verify
 
 ```sh
 # Xray is alive
@@ -285,10 +308,10 @@ At both the nft and xray layers, A rules are evaluated before T rules. When a de
 
 ## How to update
 
-Everything is orchestrated by cron (example in `examples/crontab.example`):
+Everything is orchestrated by cron. bootstrap installs the managed block automatically (reference copy: `examples/crontab.example`):
 
 - `update-assets.sh` — weekly: update `geosite.dat` / `geoip.dat` / `geosite-custom.dat` (if `GEOSITE_CUSTOM_URL` is set) from `GEOSITE_URL` / `GEOIP_URL` / `GEOSITE_CUSTOM_URL`.
-- `update-managed-stack.sh` — daily: update Xray templates and nft templates from `REPO_RAW`.
+- `update-managed-stack.sh` — daily: update Xray/nft templates and managed helper scripts from `REPO_RAW`.
 - `fetch-remote-lists.sh` — every few hours: download remote lists.
 - `fetch-allow-domains.sh` — every 6 hours: download allow-domains provider lists (no-op if `ALLOW_DOMAINS_BASE` is empty).
 - `update-sets.sh` — every 15–30 minutes: merge lists + resolve domains + atomic replace set content.
