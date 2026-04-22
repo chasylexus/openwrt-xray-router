@@ -10,8 +10,9 @@
 # Usage:
 #   sh bootstrap-xray-v2.sh [--force-init] [REPO_RAW_URL]
 #
-# REPO_RAW_URL — базовый URL до raw-файлов репозитория, например:
-#   https://raw.githubusercontent.com/you/openwrt-xray-router/main
+# REPO_RAW_URL — optional override of the built-in raw repo base URL.
+# Default:
+#   https://raw.githubusercontent.com/chasylexus/openwrt-xray-router/refs/heads/main
 #
 # Идемпотентен: повторный запуск обновляет managed-файлы, но не трогает
 # secret.env и lists/local.
@@ -19,7 +20,9 @@
 set -eu
 
 MODE="ensure"
-REPO_RAW=""
+DEFAULT_REPO_RAW="https://raw.githubusercontent.com/chasylexus/openwrt-xray-router/refs/heads/main"
+REPO_RAW="$DEFAULT_REPO_RAW"
+REPO_RAW_OVERRIDDEN=0
 XRAY_ROOT="/etc/xray"
 INITD="/etc/init.d/xray"
 
@@ -54,30 +57,6 @@ prompt_line() {
     else
         printf '%s\n' "$default"
     fi
-}
-
-prompt_repo_raw() {
-    is_interactive || {
-        usage
-        die 'REPO_RAW_URL is required in non-interactive mode'
-    }
-
-    log 'REPO_RAW not provided; entering interactive setup'
-    printf '%s\n' 'Expected format example:' >/dev/tty
-    printf '%s\n' '  https://raw.githubusercontent.com/<owner>/<repo>/<branch>' >/dev/tty
-    printf '%s\n' 'Trailing slash is OK; bootstrap will normalize it.' >/dev/tty
-
-    while :; do
-        reply=$(prompt_line 'Enter REPO_RAW URL' '')
-        reply=$(normalize_repo_raw "$reply")
-        case "$reply" in
-            http://*|https://*)
-                REPO_RAW=$reply
-                return 0
-                ;;
-        esac
-        printf '%s\n' 'Please enter a full http(s) URL in raw format.' >/dev/tty
-    done
 }
 
 shell_quote_single() {
@@ -394,17 +373,17 @@ while [ $# -gt 0 ]; do
             exit 2
             ;;
         *)
-            [ -z "$REPO_RAW" ] || {
+            [ "$REPO_RAW_OVERRIDDEN" = 0 ] || {
                 usage
                 exit 2
             }
             REPO_RAW=$1
+            REPO_RAW_OVERRIDDEN=1
             ;;
     esac
     shift
 done
 
-[ -n "$REPO_RAW" ] || prompt_repo_raw
 REPO_RAW=$(normalize_repo_raw "$REPO_RAW")
 
 # ------- 1. preflight checks ---------------------------------------------
@@ -414,6 +393,7 @@ need_bin() {
 }
 
 log 'checking required binaries'
+log "using REPO_RAW=$REPO_RAW"
 need_bin sh
 need_bin awk
 need_bin sed

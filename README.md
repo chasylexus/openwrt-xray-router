@@ -6,10 +6,10 @@ with fallback through Xray routing by domain / geosite / geoip.
 
 Designed for set-and-forget deployment: safe bootstrap ensure → optional `--force-init` → cron → atomic updates → rollback on any validation error.
 
-`REPO_RAW` in this README means the base raw URL of your GitHub repo branch, for example:
+`REPO_RAW` in this README means the base raw URL from which the router fetches repo-tracked files. The built-in default is:
 
 ```text
-https://raw.githubusercontent.com/chasylexus/openwrt-xray-router/main
+https://raw.githubusercontent.com/chasylexus/openwrt-xray-router/refs/heads/main
 ```
 
 Bootstrap uses `REPO_RAW` to fetch only repo-tracked files: helper scripts, templates, starter lists, and `secret.env.example`.
@@ -184,35 +184,35 @@ You can also start with the default examples.
 Preferred path for a fresh router:
 
 ```sh
-export REPO_RAW='https://raw.githubusercontent.com/<you>/<repo>/main'
-uclient-fetch -O /tmp/bootstrap.sh "$REPO_RAW/bootstrap/bootstrap-xray-v2.sh" \
-  || wget -O /tmp/bootstrap.sh "$REPO_RAW/bootstrap/bootstrap-xray-v2.sh"
-sh /tmp/bootstrap.sh --force-init "$REPO_RAW"
+BOOTSTRAP_URL='https://raw.githubusercontent.com/chasylexus/openwrt-xray-router/refs/heads/main/bootstrap/bootstrap-xray-v2.sh'
+uclient-fetch -O /tmp/bootstrap.sh "$BOOTSTRAP_URL" \
+  || wget -O /tmp/bootstrap.sh "$BOOTSTRAP_URL"
+sh /tmp/bootstrap.sh --force-init
 ```
 
 That path is intentionally split in two network phases:
-- Phase 1 uses `REPO_RAW` first. bootstrap pulls repo files, can prompt for `REPO_RAW` and `T_VLESS_URL` / `A_VLESS_URL`, writes `secret.env`, and prepares the managed stack.
+- Phase 1 uses `REPO_RAW` first. bootstrap pulls repo files, can prompt for `T_VLESS_URL` / `A_VLESS_URL`, writes `secret.env`, and prepares the managed stack.
 - Phase 2 touches OpenWrt package feeds only when needed. If the router already has the critical pre-route tools (`nft`, `ip`, `uci`, `xray`, downloader), bootstrap defers package feeds until after routing is up. If one of those critical pieces is missing, feed access becomes unavoidable before routing.
 
 ### 3. On the router, as root:
 
 ```sh
-# replace URL with your fork
-export REPO_RAW='https://raw.githubusercontent.com/<you>/<repo>/main'
-wget -O /tmp/bootstrap.sh "$REPO_RAW/bootstrap/bootstrap-xray-v2.sh"
-sh /tmp/bootstrap.sh "$REPO_RAW"
-```
-
-You can also omit the argument entirely in an interactive shell:
-
-```sh
-wget -O /tmp/bootstrap.sh 'https://raw.githubusercontent.com/<owner>/<repo>/<branch>/bootstrap/bootstrap-xray-v2.sh'
+# uses built-in REPO_RAW unless you pass an explicit override URL
+BOOTSTRAP_URL='https://raw.githubusercontent.com/chasylexus/openwrt-xray-router/refs/heads/main/bootstrap/bootstrap-xray-v2.sh'
+wget -O /tmp/bootstrap.sh "$BOOTSTRAP_URL"
 sh /tmp/bootstrap.sh
 ```
 
-In that mode bootstrap asks for:
-- `REPO_RAW` with an example of the expected raw URL format, and normalizes a trailing slash if present
-- `T_VLESS_URL` and `A_VLESS_URL` with neutral examples; pressing Enter on `A_VLESS_URL` reuses `T_VLESS_URL`
+If you ever need to point the router at a different repo/branch temporarily, you can still pass an explicit override:
+
+```sh
+wget -O /tmp/bootstrap.sh 'https://raw.githubusercontent.com/chasylexus/openwrt-xray-router/refs/heads/main/bootstrap/bootstrap-xray-v2.sh'
+sh /tmp/bootstrap.sh --force-init 'https://raw.githubusercontent.com/<owner>/<repo>/refs/heads/<branch>'
+```
+
+In interactive mode bootstrap asks only for:
+- `T_VLESS_URL` and `A_VLESS_URL` with neutral examples
+- pressing Enter on `A_VLESS_URL` reuses `T_VLESS_URL`
 
 Bootstrap will:
 - create `/etc/xray/{config.d,nft.d,lists/{local,remote,merged},templates,state,bin,dnsmasq.d}`;
@@ -251,7 +251,7 @@ When a `*_VLESS_URL` variable is set, it takes precedence. The parser is intenti
 Once `secret.env` is filled, the preferred one-shot path is:
 
 ```sh
-sh /tmp/bootstrap.sh --force-init "$REPO_RAW"
+sh /tmp/bootstrap.sh --force-init
 ```
 
 That reruns the safe bootstrap steps, migrates/install the managed cron block, performs the full staged apply chain, and starts `xray` if needed.
