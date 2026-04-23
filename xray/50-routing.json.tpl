@@ -342,6 +342,7 @@
         "inboundTag": ["c-def-in"],
         "domain": [
           "geosite:youtube",
+          "full:youtubei.googleapis.com",
           "geosite:spotify",
           "geosite:facebook",
           "geosite:instagram",
