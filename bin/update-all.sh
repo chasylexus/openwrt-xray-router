@@ -4,9 +4,9 @@
 # Manual "bring everything current" wrapper. Runs the managed template/helper
 # refresh first, immediately rehydrates live nft sets (apply-nft recreates the
 # xray_* tables with empty sets), waits for the router-side T inbound to come
-# back after reload, then asset refresh, remote list refresh, allow-domain
-# refresh, and a final update-sets pass so live nft sets end up aligned with
-# whatever changed.
+# back after each Xray reload, then asset refresh, remote list refresh,
+# allow-domain refresh, and a final update-sets pass so live nft sets end up
+# aligned with whatever changed.
 #
 # Intended for manual invocation when you want the router fully updated now,
 # instead of waiting for the different cron cadences to converge.
@@ -89,8 +89,9 @@ run_step update-managed-stack "$XRAY_ROOT/bin/update-managed-stack.sh"
 # live sets start empty again until update-sets repopulates them. Prime them
 # before any subsequent network fetches that may rely on router-side T routing.
 run_step prime-sets          "$XRAY_ROOT/bin/update-sets.sh"
-run_step wait-for-router-t   wait_for_router_t_inbound
+run_step wait-for-router-t-post-managed  wait_for_router_t_inbound
 run_step update-assets        "$XRAY_ROOT/bin/update-assets.sh"
+run_step wait-for-router-t-post-assets   wait_for_router_t_inbound
 run_step fetch-remote-lists   "$XRAY_ROOT/bin/fetch-remote-lists.sh"
 run_step fetch-allow-domains  "$XRAY_ROOT/bin/fetch-allow-domains.sh"
 run_step update-sets          "$XRAY_ROOT/bin/update-sets.sh"
