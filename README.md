@@ -265,10 +265,11 @@ Manual apply still works too:
 `update-all.sh` runs the full manual refresh chain in order:
 1. `update-managed-stack.sh`
 2. `update-sets.sh` (prime the live nft sets after `apply-nft` recreates them)
-3. `update-assets.sh`
-4. `fetch-remote-lists.sh`
-5. `fetch-allow-domains.sh`
-6. `update-sets.sh` (final pass so live sets match the freshly downloaded lists)
+3. wait for the router-side T inbound to start listening again after reload
+4. `update-assets.sh`
+5. `fetch-remote-lists.sh`
+6. `fetch-allow-domains.sh`
+7. `update-sets.sh` (final pass so live sets match the freshly downloaded lists)
 
 Each step must finish with `OK` and must not touch working state on error.
 
