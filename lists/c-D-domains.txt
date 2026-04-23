@@ -12,12 +12,38 @@ icloud-content.com
 apple-cloudkit.com
 mzstatic.com
 captive.apple.com
+cable.auth.com
 
 # Captive-portal / connectivity checks (must NOT go through proxy)
+connectivity-check.ubuntu.com
 connectivitycheck.gstatic.com
 detectportal.firefox.com
 msftconnecttest.com
+www.msftconnecttest.com
+www.msftncsi.com
+dns.msftncsi.com
 nmcheck.gnome.org
+network-test.debian.org
+
+# Public Wi-Fi / operator portals
+boingo.com
+wayport.net
+nomadix.com
+aptilo.com
+icomera.com
+turkcell.com.tr
+turktelekom.com.tr
+vodafone.com.tr
+du.ae
+etisalat.ae
+mts.ru
+beeline.ru
+megafon.ru
+tele2.ru
+yota.ru
+sbrf.ru
+wifi.mts.ru
+hotspot.beeline.ru
 
 # Personal direct override
 kvk.com

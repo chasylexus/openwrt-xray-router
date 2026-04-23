@@ -43,6 +43,7 @@
         "inboundTag": ["c-def-in"],
         "domain": [
           "full:captive.apple.com",
+          "full:cable.auth.com",
           "full:connectivitycheck.gstatic.com",
           "full:connectivity-check.ubuntu.com",
           "full:detectportal.firefox.com",
@@ -52,6 +53,57 @@
           "full:dns.msftncsi.com",
           "full:nmcheck.gnome.org",
           "full:network-test.debian.org"
+        ],
+        "outboundTag": "D"
+      },
+
+      {
+        "_comment": "1b1. Apple / iCloud / Wi-Fi-portal / carrier suffixes — direct. Keep these outside the proxy even if future geosite tags widen.",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "domain": [
+          "domain:local",
+          "domain:lan",
+          "domain:direct",
+          "domain:aero",
+          "domain:apple.com",
+          "domain:icloud.com",
+          "domain:icloud-content.com",
+          "domain:apple-cloudkit.com",
+          "domain:mzstatic.com",
+          "domain:boingo.com",
+          "domain:wayport.net",
+          "domain:nomadix.com",
+          "domain:aptilo.com",
+          "domain:icomera.com",
+          "domain:turkcell.com.tr",
+          "domain:turktelekom.com.tr",
+          "domain:vodafone.com.tr",
+          "domain:du.ae",
+          "domain:etisalat.ae",
+          "domain:mts.ru",
+          "domain:beeline.ru",
+          "domain:megafon.ru",
+          "domain:tele2.ru",
+          "domain:yota.ru",
+          "domain:sbrf.ru",
+          "domain:wifi.mts.ru",
+          "domain:hotspot.beeline.ru"
+        ],
+        "outboundTag": "D"
+      },
+
+      {
+        "_comment": "1b2. Captive-portal style keywords — direct. This is intentionally earlier than ads and proxy rules so sign-in pages stay reachable on flaky guest Wi-Fi.",
+        "type": "field",
+        "inboundTag": ["c-def-in"],
+        "domain": [
+          "keyword:hotspot",
+          "keyword:wifi",
+          "keyword:wi-fi",
+          "keyword:guest",
+          "keyword:airport",
+          "keyword:airports"
         ],
         "outboundTag": "D"
       },
