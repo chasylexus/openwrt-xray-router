@@ -1,5 +1,10 @@
 # c-A-ipv4.txt
-# IPv4 addresses/CIDRs for CLIENT LAN traffic that should be routed via A.
+# LEGACY pre-domain-routing namespace.
+#
+# Current per-IP forced A routing uses c-A-dst-v4.txt (and c-A-dst-v6.txt).
+# Current domain routing lives in xray/50-routing.json.tpl, not in this file.
+# This file is still merged so existing local overrides are not deleted, but
+# current update-sets.sh does not apply it to a live nft set.
 #
 # Examples:
 # 104.16.0.0/13         # cloudflare (illustrative only)

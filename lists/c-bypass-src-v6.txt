@@ -1,0 +1,4 @@
+# c-bypass-src-v6.txt
+#
+# IPv6 LAN source addresses that should bypass xray entirely.
+# One per line. # starts a comment. Whitespace ignored.

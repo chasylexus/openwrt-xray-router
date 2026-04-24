@@ -1,12 +1,13 @@
 # c-T-domains.txt
-# Domains to force through T for LAN clients.
-# T = main RKN-bypass exit.
+# LEGACY pre-domain-routing namespace.
+#
+# Current T-by-domain rules live in xray/50-routing.json.tpl. Current per-IP
+# forced T routing uses c-T-dst-v4.txt / c-T-dst-v6.txt.
+# This file is still merged so existing local/remote overrides are not
+# deleted, but current update-sets.sh does not apply it to a live nft set.
 #
 # NOTE on Google: gemini/aistudio/notebooklm and other AI-specific
-# subdomains are in c-A-domains.txt. Their resolved IPs may overlap with
-# general google.com edge IPs — that is why the nft layer evaluates
-# c_A_v4 BEFORE c_T_v4. Domain-level disambiguation for the fallback
-# c-def-in inbound happens in xray/50-routing.json.tpl.
+# subdomains are handled before broad Google rules in xray/50-routing.json.tpl.
 
 # --- Google (search, mail, drive, docs, play, youtube) ---
 google.com

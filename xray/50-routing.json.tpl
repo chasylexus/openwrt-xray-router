@@ -6,24 +6,24 @@
       {
         "_comment": "=== ROUTER-SIDE (nat/output) — explicit per-inbound binding ===",
         "type": "field",
-        "inboundTag": ["r-T-in"],
+        "inboundTag": ["r-T-in", "r-T6-in"],
         "outboundTag": "T"
       },
       {
         "type": "field",
-        "inboundTag": ["r-A-in"],
+        "inboundTag": ["r-A-in", "r-A6-in"],
         "outboundTag": "A"
       },
 
       {
         "_comment": "=== CLIENT-SIDE per-IP forced bindings (nft tproxy'd these) — no domain decision, outbound implicit by inbound ===",
         "type": "field",
-        "inboundTag": ["c-T-in"],
+        "inboundTag": ["c-T-in", "c-T6-in"],
         "outboundTag": "T"
       },
       {
         "type": "field",
-        "inboundTag": ["c-A-in"],
+        "inboundTag": ["c-A-in", "c-A6-in"],
         "outboundTag": "A"
       },
 
@@ -32,7 +32,7 @@
         "_comment_override_hint": "For per-device force-outbound, insert a rule ABOVE this block: { type: 'field', inboundTag: ['c-def-in'], source: ['192.168.1.50/32'], outboundTag: 'T' }. For per-device FULL bypass (skip xray), add the device IP to /etc/xray/lists/local/c-bypass-src-v4.txt — that's handled at nft level.",
         "_comment_1": "1. defense-in-depth: LAN/private never leaves via proxy",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "ip": ["geoip:private"],
         "outboundTag": "D"
       },
@@ -40,7 +40,7 @@
       {
         "_comment": "1b. captive portal probes — NEVER via proxy. Without these, geosite:google catches connectivitycheck.gstatic.com and geosite:microsoft catches msftconnecttest.com -> Android/Windows think there is no internet and drop/reconnect WiFi.",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "full:captive.apple.com",
           "full:cable.auth.com",
@@ -60,7 +60,7 @@
       {
         "_comment": "1b1. Apple / iCloud / Wi-Fi-portal / carrier suffixes — direct. Keep these outside the proxy even if future geosite tags widen.",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "domain:local",
           "domain:lan",
@@ -96,7 +96,7 @@
       {
         "_comment": "1b2. Captive-portal style keywords — direct. This is intentionally earlier than ads and proxy rules so sign-in pages stay reachable on flaky guest Wi-Fi.",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "keyword:hotspot",
           "keyword:wifi",
@@ -111,7 +111,7 @@
       {
         "_comment": "1c. WhatsApp domains before ads. Keeps chat/media flows from falling into geosite:category-ads-all false positives.",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "geosite:whatsapp",
           "domain:whatsapp.com",
@@ -125,7 +125,7 @@
       {
         "_comment": "1d. Narrow WhatsApp IP fallback before ads. Exact /32 observed from iPhone as repeated [c-def-in -> B] during app open.",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "ip": [
           "157.240.253.60"
         ],
@@ -135,7 +135,7 @@
       {
         "_comment": "1e. iTerm2 update/appcast domain -> T. Keeps the updater off the flaky direct path without widening unrelated traffic.",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "full:iterm2.com",
           "domain:iterm2.com"
@@ -146,7 +146,7 @@
       {
         "_comment": "1f. Narrow iTerm2 IP fallback before ads. Exact Cloudflare /32s observed as repeated [c-def-in -> D] during update checks.",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "ip": [
           "104.21.68.5",
           "172.67.184.27"
@@ -157,7 +157,7 @@
       {
         "_comment": "2. ads (optional — reject before they can go anywhere)",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": ["geosite:category-ads-all"],
         "outboundTag": "B"
       },
@@ -165,7 +165,7 @@
       {
         "_comment": "3a. Google AI -> A (itdoginfo GOOGLE-AI tag + explicit domains for coverage)",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "ext:geosite-custom.dat:GOOGLE-AI",
           "domain:gemini.google.com",
@@ -203,7 +203,7 @@
       {
         "_comment": "3b. streaming (Netflix / Peacock / Prime Video) -> A",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "geosite:netflix",
           "domain:primevideo.com",
@@ -215,7 +215,7 @@
       {
         "_comment": "3c. IP geolocation / 'what is my IP' checks -> A (verify second exit independently)",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "domain:whatismyip.com"
         ],
@@ -225,7 +225,7 @@
       {
         "_comment": "4a. OpenAI / ChatGPT -> T",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "geosite:openai",
           "domain:openai.com",
@@ -240,7 +240,7 @@
       {
         "_comment": "4b. Anthropic / Claude -> T",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "geosite:anthropic",
           "domain:anthropic.com",
@@ -254,7 +254,7 @@
       {
         "_comment": "4c. xAI / Grok / Microsoft Copilot / other AI -> T",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "geosite:category-ai-!cn",
           "domain:grok.com",
@@ -283,7 +283,7 @@
       {
         "_comment": "4d. AI Code / Design / Media / Infra -> T",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "domain:cursor.com",
           "domain:cursor.sh",
@@ -307,7 +307,7 @@
       {
         "_comment": "4e. Explicit T suffix overrides that are not yet covered well enough by upstream geosite tags",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "domain:aistudiocdn.com",
           "domain:character.ai",
@@ -339,7 +339,7 @@
       {
         "_comment": "5a. Big social / media / search via geosite -> T",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "geosite:youtube",
           "full:youtubei.googleapis.com",
@@ -370,7 +370,7 @@
       {
         "_comment": "5b. Telegram MTProto DC IP ranges -> T. Mobile/desktop clients connect to datacenters by IP without DNS, so geosite:telegram (which is domain-only) does not catch them. These ranges are stable and not shared with CDNs, so an IP rule is safe.",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "ip": [
           "5.28.192.0/18",
           "91.105.192.0/23",
@@ -380,7 +380,11 @@
           "91.108.56.0/22",
           "95.161.64.0/20",
           "149.154.160.0/20",
-          "185.76.151.0/24"
+          "185.76.151.0/24",
+          "2001:67c:4e8::/48",
+          "2001:b28:f23c::/47",
+          "2001:b28:f23f::/48",
+          "2a0a:f280::/32"
         ],
         "outboundTag": "T"
       },
@@ -388,7 +392,7 @@
       {
         "_comment": "5c. WhatsApp IP ranges -> T. App connects to Meta DC by IP for media/push without DNS, so domain rules alone miss them.",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "ip": [
           "158.85.224.160/27",
           "158.85.46.128/27",
@@ -397,10 +401,48 @@
           "173.192.231.32/27",
           "208.43.122.128/27",
           "184.173.128.0/17",
-          "50.22.198.204/30" #,
-          # "18.194.0.0/15",
-          # "34.224.0.0/12",
-          # "54.242.0.0/15"
+          "50.22.198.204/30",
+          "2620:0:1c00::/40",
+          "2620:10d:c090::/44",
+          "2a03:2880::/32",
+          "2a03:2887:ff00::/48",
+          "2a03:2887:ff02::/47",
+          "2a03:2887:ff04::/46",
+          "2a03:2887:ff09::/48",
+          "2a03:2887:ff0a::/48",
+          "2a03:2887:ff1b::/48",
+          "2a03:2887:ff1c::/48",
+          "2a03:2887:ff1e::/48",
+          "2a03:2887:ff20::/48",
+          "2a03:2887:ff22::/47",
+          "2a03:2887:ff28::/46",
+          "2a03:2887:ff2f::/48",
+          "2a03:2887:ff30::/48",
+          "2a03:2887:ff33::/48",
+          "2a03:2887:ff37::/48",
+          "2a03:2887:ff38::/46",
+          "2a03:2887:ff3f::/48",
+          "2a03:2887:ff40::/46",
+          "2a03:2887:ff44::/47",
+          "2a03:2887:ff48::/46",
+          "2a03:2887:ff4d::/48",
+          "2a03:2887:ff4e::/47",
+          "2a03:2887:ff50::/45",
+          "2a03:2887:ff58::/47",
+          "2a03:2887:ff5a::/48",
+          "2a03:2887:ff5f::/48",
+          "2a03:2887:ff60::/48",
+          "2a03:2887:ff62::/47",
+          "2a03:2887:ff64::/46",
+          "2a03:2887:ff68::/46",
+          "2a03:2887:ff70::/47",
+          "2a03:2887:ff73::/48",
+          "2c0f:ef78:3::/48",
+          "2c0f:ef78:5::/48",
+          "2c0f:ef78:9::/48",
+          "2c0f:ef78:c::/47",
+          "2c0f:ef78:e::/48",
+          "2c0f:ef78:10::/47"
         ],
         "outboundTag": "T"
       },
@@ -408,7 +450,7 @@
       {
         "_comment": "6. RU blocked — media / torrents / sci / streaming / news -> T (itdoginfo HDREZKA tag + explicit domains/keywords)",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "ext:geosite-custom.dat:HDREZKA",
           "keyword:rutracker",
@@ -470,7 +512,7 @@
       {
         "_comment": "7. Dev tools / shopping / finance / monitoring / misc -> T",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "domain": [
           "domain:jetbrains.com",
           "domain:stackoverflow.com",
@@ -518,7 +560,7 @@
       {
         "_comment": "7b. KinoPub Apple TV fallback IPs -> T. These are exact /32s observed from the Apple TV client when sniff/domain routing did not recover a match, so keep them narrow and revisit only if they stop appearing.",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "ip": [
           "104.21.12.188",
           "172.67.132.76"
@@ -529,7 +571,7 @@
       {
         "_comment": "8. fallback: anything not matched above goes direct (home ISP)",
         "type": "field",
-        "inboundTag": ["c-def-in"],
+        "inboundTag": ["c-def-in", "c-def6-in"],
         "outboundTag": "D"
       }
     ]

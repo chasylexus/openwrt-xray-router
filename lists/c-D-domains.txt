@@ -1,7 +1,10 @@
 # c-D-domains.txt
-# Domains to force-direct for LAN clients. update-sets.sh resolves each and
-# adds the IPs to c_D_v4 (nft `return` path).
-# Also: c-D-in inbound in Xray routes these to outbound D.
+# LEGACY pre-domain-routing namespace.
+#
+# Current direct-by-domain rules live in xray/50-routing.json.tpl. Current
+# full bypass without an Xray hop uses c-bypass-dst-* / c-bypass-src-*.
+# This file is still merged so existing local overrides are not deleted, but
+# current update-sets.sh does not apply it to a live nft set.
 
 # Apple
 apple.com

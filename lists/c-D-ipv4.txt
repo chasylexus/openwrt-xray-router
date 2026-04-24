@@ -1,9 +1,10 @@
 # c-D-ipv4.txt
-# IPv4 addresses/CIDRs for CLIENT LAN traffic that should go DIRECT.
-# These get nft `return` in prerouting — no Xray hop at all.
+# LEGACY pre-domain-routing namespace. Current nft bypass uses:
+#   c-bypass-dst-v4.txt  (direct by destination)
+#   c-bypass-src-v4.txt  (direct by LAN source)
 #
-# Typical direct targets: local services you host, local ISP speedtests,
-# domestic CDNs you explicitly want to keep off the tunnel.
+# This file is still merged so existing local overrides are not deleted, but
+# current update-sets.sh does not apply it to a live nft set.
 #
 # Examples:
 # 5.255.255.0/24        # yandex

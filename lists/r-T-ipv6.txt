@@ -1,0 +1,10 @@
+# r-T-ipv6.txt
+#
+# Router-side IPv6 destinations that must go through outbound T.
+# Seeded with Telegram IPv6 DC ranges (matches the MTProto-by-IP rationale
+# used in xray/50-routing.json.tpl).
+#
+2001:67c:4e8::/48
+2001:b28:f23c::/47
+2001:b28:f23f::/48
+2a0a:f280::/32

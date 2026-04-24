@@ -14,6 +14,11 @@
 # concatenated into one allow-<target> file. Adjust ITEMS to extend
 # coverage. Keep target names aligned with the naming scheme used by
 # merge-lists.sh (c-T-domains.txt, c-A-domains.txt, ...).
+#
+# NOTE: c-*-domains.txt are legacy compatibility inputs in the current
+# sniffing/domain-routing design. This script is retained so existing local
+# workflows do not lose downloaded data, but live routing is controlled by
+# xray/50-routing.json.tpl and geosite assets.
 
 set -eu
 
@@ -106,6 +111,7 @@ ITEMS='
 c-T-domains.txt Russia/inside-raw.lst
 c-T-domains.txt Services/google_ai.lst
 c-T-domains.txt Services/hdrezka.lst
+r-T-ipv6.txt Subnets/IPv6/telegram.lst
 '
 
 # Iterate unique targets, concatenating all suffixes into one dst.

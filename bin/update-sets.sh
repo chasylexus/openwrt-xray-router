@@ -1,28 +1,22 @@
 #!/bin/sh
 # update-sets.sh
 #
-# Merge lists, resolve domain lists to IPv4 via nslookup, and atomically
-# replace the element contents of nft sets (no table rebuild).
+# Merge lists, resolve domain lists via nslookup, and atomically replace the
+# element contents of nft sets (no table rebuild).
 #
 # Sets:
 #   Router-side (nat/output, REDIRECT to loopback):
-#     r_T_v4          <- r-T-ipv4.txt + resolve(r-T-domains.txt)
-#     r_A_v4          <- r-A-ipv4.txt + resolve(r-A-domains.txt)
+#     r_T_v4 / r_T_v6 <- r-T-ipv4.txt / r-T-ipv6.txt + resolve(r-T-domains.txt)
+#     r_A_v4 / r_A_v6 <- r-A-ipv4.txt / r-A-ipv6.txt + resolve(r-A-domains.txt)
 #
-#   Client-side (prerouting, TPROXY) — user-curated bypass. These skip
-#   xray entirely (return from prerouting). NOT per-outbound routing
-#   (that lives in xray — see commit 7f118eb for CDN-collision rationale):
-#     c_bypass_dst_v4 <- c-bypass-dst-v4.txt (static IPs, no resolve)
-#     c_bypass_src_v4 <- c-bypass-src-v4.txt (LAN source IPs, no resolve)
+#   Client-side (prerouting, TPROXY) — user-curated bypass and per-IP binds:
+#     c_bypass_dst_v4 / c_bypass_dst_v6 <- c-bypass-dst-v4.txt / c-bypass-dst-v6.txt
+#     c_bypass_src_v4 / c_bypass_src_v6 <- c-bypass-src-v4.txt / c-bypass-src-v6.txt
+#     c_T_dst_v4 / c_T_dst_v6           <- c-T-dst-v4.txt / c-T-dst-v6.txt
+#     c_A_dst_v4 / c_A_dst_v6           <- c-A-dst-v4.txt / c-A-dst-v6.txt
 #
 # Safe: snapshots current set contents to /etc/xray/state/last-good-sets.txt
-# before replacing. On any resolution error that produces an empty result for
-# a non-empty input, the entire run aborts without touching sets.
-#
-# Usage:
-#   update-sets.sh               # normal
-#   update-sets.sh --restore     # restore from last-good-sets.txt
-#   update-sets.sh --dry-run     # print what would change, do nothing
+# before replacing. On nft apply failure it restores the last-good snapshot.
 
 set -eu
 
@@ -31,6 +25,7 @@ MERGED="$XRAY_ROOT/lists/merged"
 STATE="$XRAY_ROOT/state"
 LAST_GOOD="$STATE/last-good-sets.txt"
 MERGER="$XRAY_ROOT/bin/merge-lists.sh"
+SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 log() { printf '[update-sets] %s\n' "$*"; }
 warn() { printf '[update-sets][WARN] %s\n' "$*" >&2; }
@@ -45,7 +40,6 @@ restore_last_good() {
     nft -f "$LAST_GOOD"
 }
 
-# ------- restore path ----------------------------------------------------
 if [ "$mode" = "--restore" ]; then
     log "restoring from $LAST_GOOD"
     restore_last_good
@@ -53,26 +47,19 @@ if [ "$mode" = "--restore" ]; then
     exit 0
 fi
 
-# ------- preflight -------------------------------------------------------
 command -v nslookup >/dev/null 2>&1 || die 'nslookup not found'
 command -v nft      >/dev/null 2>&1 || die 'nft not found'
 
-# ------- step 1: rebuild merged lists ------------------------------------
+if [ -r "$SELF_DIR/load-env.sh" ]; then
+    # shellcheck disable=SC1091
+    . "$SELF_DIR/load-env.sh"
+    xray_load_env
+fi
+
 "$MERGER" || die 'merge-lists failed'
 
-# ------- step 2: resolve domains to IPv4 --------------------------------
-#
-# One DNS lookup per line. Use system resolver (dnsmasq on this router).
-# If a domain fails to resolve we WARN but continue — the whole run only
-# aborts if the resulting set for a non-empty input domain list would be
-# empty AND the ipv4 companion list is also empty (i.e. we'd clear a live set).
-
-# Helper: resolve one domain -> IPv4 lines. Written to $WORK/resolve-one.sh
-# so we can spawn it in parallel without quoting hell. Each child does
-# nslookup + per-invocation awk filter, then writes only clean IPv4 lines
-# to stdout — so downstream pipe can mix outputs safely.
-write_resolver() {
-    cat > "$1" <<'RESOLVE_EOF'
+write_resolver_v4() {
+    cat > "$1" <<'RESOLVE4_EOF'
 #!/bin/sh
 nslookup "$1" 2>/dev/null | awk '
     /^Name:/    { flag=1; next }
@@ -82,22 +69,28 @@ nslookup "$1" 2>/dev/null | awk '
         print $0
     }
 '
-RESOLVE_EOF
+RESOLVE4_EOF
     chmod +x "$1"
 }
 
-# Pure-shell parallel resolver — BusyBox on OpenWrt 25.12 is compiled
-# WITHOUT FEATURE_XARGS_SUPPORT_PARALLEL, so `xargs -P` is unavailable
-# (even `-P 1` errors out). We shard the domain file by `NR % N` into N
-# worker subshells with `&` and join with `wait`. POSIX-guaranteed,
-# no external dependencies.
-#
-# Each worker reads only its slice of the file and calls $RESOLVER
-# sequentially; the N workers run concurrently, giving the same ~N×
-# speedup we used to get from xargs -P.
+write_resolver_v6() {
+    cat > "$1" <<'RESOLVE6_EOF'
+#!/bin/sh
+nslookup "$1" 2>/dev/null | awk '
+    /^Name:/    { flag=1; next }
+    /^Address/ && flag {
+        sub(/^Address[0-9]*:[[:space:]]*/, "", $0)
+        if ($0 ~ /:/) print
+    }
+'
+RESOLVE6_EOF
+    chmod +x "$1"
+}
+
 parallel_resolve() {
     df="$1"
     N="${2:-16}"
+    resolver="$3"
     [ -s "$df" ] || return 0
     k=0
     while [ "$k" -lt "$N" ]; do
@@ -105,7 +98,7 @@ parallel_resolve() {
             awk -v n="$N" -v k="$k" 'NR % n == k' "$df" |
             while IFS= read -r dom; do
                 [ -z "$dom" ] && continue
-                "$RESOLVER" "$dom"
+                "$resolver" "$dom"
             done
         ) &
         k=$((k + 1))
@@ -113,17 +106,11 @@ parallel_resolve() {
     wait
 }
 
-# Width filter for client per-IP routing sets — drops any CIDR broader
-# than $CLIENT_DST_MIN_PREFIX (default /24). Bare /32 IPs always pass.
-# Rejected entries are warned to stderr; never abort. This is the
-# guardrail that prevents a careless paste of a CDN /12 from silently
-# routing half the internet through one outbound (the old pre-7f118eb
-# CDN-collision bug, just less subtle).
-narrow_filter() {
+narrow_filter_v4() {
     label="$1"
     in="$2"
     out="$3"
-    threshold="${CLIENT_DST_MIN_PREFIX:-24}"
+    threshold="$4"
     awk -v t="$threshold" -v label="$label" '
         /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ { print; next }
         /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/[0-9]+$/ {
@@ -134,8 +121,22 @@ narrow_filter() {
     ' "$in" > "$out"
 }
 
-# Build a staged file per set, source of truth: merged/*.txt
-stage_set() {
+narrow_filter_v6() {
+    label="$1"
+    in="$2"
+    out="$3"
+    threshold="$4"
+    awk -v t="$threshold" -v label="$label" '
+        /^[0-9A-Fa-f:]+$/ { print; next }
+        /^[0-9A-Fa-f:]+\/[0-9]+$/ {
+            n = $0; sub(/.*\//, "", n)
+            if (n + 0 >= t + 0) { print; next }
+            printf "[update-sets][reject %s] CIDR %s broader than /%s\n", label, $0, t > "/dev/stderr"
+        }
+    ' "$in" > "$out"
+}
+
+stage_set_v4() {
     set_table="$1"
     set_name="$2"
     ipv4_file="$3"
@@ -144,17 +145,11 @@ stage_set() {
 
     {
         [ -s "$ipv4_file" ] && cat "$ipv4_file"
-        if [ -s "$domain_file" ]; then
-            # Parallel DNS resolution — ~10-16x faster on lists with
-            # hundreds/thousands of domains. Without this, a cron tick
-            # on c-T-domains.txt (~1200 domains) takes 4-5 minutes.
-            parallel_resolve "$domain_file" "$PARALLEL"
-        fi
+        [ -s "$domain_file" ] && parallel_resolve "$domain_file" "$PARALLEL" "$RESOLVER_V4"
     } | awk '
         /^[0-9]{1,3}(\.[0-9]{1,3}){3}(\/[0-9]{1,2})?$/ { print }
-      ' | sort -u > "$out"
+    ' | sort -u > "$out"
 
-    # sanity: non-empty input must not produce empty output
     in_nonempty=0
     [ -s "$ipv4_file" ]   && in_nonempty=1
     [ -s "$domain_file" ] && in_nonempty=1
@@ -163,52 +158,56 @@ stage_set() {
     fi
 }
 
+stage_set_v6() {
+    ipv6_file="$1"
+    domain_file="$2"
+    out="$3"
+
+    {
+        [ -s "$ipv6_file" ] && cat "$ipv6_file"
+        [ -s "$domain_file" ] && parallel_resolve "$domain_file" "$PARALLEL" "$RESOLVER_V6"
+    } | awk '
+        /^[0-9A-Fa-f:]+(\/[0-9]{1,3})?$/ { print }
+    ' | sort -u > "$out"
+}
+
 WORK="$STATE/update-sets.$$"
 mkdir -p "$WORK"
 trap 'rm -rf "$WORK"' EXIT INT TERM
 
-RESOLVER="$WORK/resolve-one.sh"
-write_resolver "$RESOLVER"
+RESOLVER_V4="$WORK/resolve-one-v4.sh"
+RESOLVER_V6="$WORK/resolve-one-v6.sh"
+write_resolver_v4 "$RESOLVER_V4"
+write_resolver_v6 "$RESOLVER_V6"
 PARALLEL="${RESOLVE_PARALLEL:-16}"
 log "resolving domains with parallelism=$PARALLEL (shell-native)"
 
-# NOTE on history: the original per-outbound client-side sets
-# (c_D_v4 / c_T_v4 / c_A_v4) were removed in 7f118eb because domain
-# resolution into them collided on CDNs (one IP, dozens of unrelated
-# services). The replacements below (c_T_dst_v4 / c_A_dst_v4) are a
-# different design:
-#   - IPs only, no domain resolution (so no CDN auto-population)
-#   - opt-in via /etc/xray/lists/local/c-{T,A}-dst-v4.txt
-#   - width-filtered by narrow_filter (CLIENT_DST_MIN_PREFIX, default /24)
-# The bypass sets remain "skip xray entirely" decisions and are unchanged.
-#
-# /dev/null as domain_file => IPs only, no resolve step.
-stage_set inet\ xray_router   r_T_v4           "$MERGED/r-T-ipv4.txt"         "$MERGED/r-T-domains.txt"   "$WORK/r_T_v4"
-stage_set inet\ xray_router   r_A_v4           "$MERGED/r-A-ipv4.txt"         "$MERGED/r-A-domains.txt"   "$WORK/r_A_v4"
-stage_set inet\ xray_clients  c_bypass_dst_v4  "$MERGED/c-bypass-dst-v4.txt"  /dev/null                   "$WORK/c_bypass_dst_v4"
-stage_set inet\ xray_clients  c_bypass_src_v4  "$MERGED/c-bypass-src-v4.txt"  /dev/null                   "$WORK/c_bypass_src_v4"
+stage_set_v4 inet\ xray_router   r_T_v4           "$MERGED/r-T-ipv4.txt"         "$MERGED/r-T-domains.txt"   "$WORK/r_T_v4.raw"
+narrow_filter_v4 r_T_v4 "$WORK/r_T_v4.raw" "$WORK/r_T_v4" "${ROUTER_DST_MIN_PREFIX:-20}"
+stage_set_v4 inet\ xray_router   r_A_v4           "$MERGED/r-A-ipv4.txt"         "$MERGED/r-A-domains.txt"   "$WORK/r_A_v4.raw"
+narrow_filter_v4 r_A_v4 "$WORK/r_A_v4.raw" "$WORK/r_A_v4" "${ROUTER_DST_MIN_PREFIX:-20}"
+stage_set_v6 "$MERGED/r-T-ipv6.txt" "$MERGED/r-T-domains.txt" "$WORK/r_T_v6.raw"
+narrow_filter_v6 r_T_v6 "$WORK/r_T_v6.raw" "$WORK/r_T_v6" "${ROUTER_DST_MIN_PREFIX6:-32}"
+stage_set_v6 "$MERGED/r-A-ipv6.txt" "$MERGED/r-A-domains.txt" "$WORK/r_A_v6.raw"
+narrow_filter_v6 r_A_v6 "$WORK/r_A_v6.raw" "$WORK/r_A_v6" "${ROUTER_DST_MIN_PREFIX6:-32}"
 
-# Per-IP forced outbound — IPs only (no domain resolution). Stage to a
-# .raw file, then narrow_filter to the final $WORK file. The empty-result
-# guard inside stage_set runs against .raw, so a list of all-broad CIDRs
-# passes stage_set and the filter just produces an empty final set —
-# which build_add then flushes-only. That's intentional: we never abort
-# the whole update because a user pasted bad data; we log + skip.
-stage_set inet\ xray_clients  c_T_dst_v4       "$MERGED/c-T-dst-v4.txt"       /dev/null                   "$WORK/c_T_dst_v4.raw"
-narrow_filter c_T_dst_v4 "$WORK/c_T_dst_v4.raw" "$WORK/c_T_dst_v4"
-stage_set inet\ xray_clients  c_A_dst_v4       "$MERGED/c-A-dst-v4.txt"       /dev/null                   "$WORK/c_A_dst_v4.raw"
-narrow_filter c_A_dst_v4 "$WORK/c_A_dst_v4.raw" "$WORK/c_A_dst_v4"
+stage_set_v4 inet\ xray_clients  c_bypass_dst_v4  "$MERGED/c-bypass-dst-v4.txt"  /dev/null "$WORK/c_bypass_dst_v4"
+stage_set_v4 inet\ xray_clients  c_bypass_src_v4  "$MERGED/c-bypass-src-v4.txt"  /dev/null "$WORK/c_bypass_src_v4"
+stage_set_v6 "$MERGED/c-bypass-dst-v6.txt" /dev/null "$WORK/c_bypass_dst_v6"
+stage_set_v6 "$MERGED/c-bypass-src-v6.txt" /dev/null "$WORK/c_bypass_src_v6"
 
-# ------- step 3: validate: tables must exist ------------------------------
+stage_set_v4 inet\ xray_clients  c_T_dst_v4       "$MERGED/c-T-dst-v4.txt"       /dev/null "$WORK/c_T_dst_v4.raw"
+narrow_filter_v4 c_T_dst_v4 "$WORK/c_T_dst_v4.raw" "$WORK/c_T_dst_v4" "${CLIENT_DST_MIN_PREFIX:-24}"
+stage_set_v4 inet\ xray_clients  c_A_dst_v4       "$MERGED/c-A-dst-v4.txt"       /dev/null "$WORK/c_A_dst_v4.raw"
+narrow_filter_v4 c_A_dst_v4 "$WORK/c_A_dst_v4.raw" "$WORK/c_A_dst_v4" "${CLIENT_DST_MIN_PREFIX:-24}"
+stage_set_v6 "$MERGED/c-T-dst-v6.txt" /dev/null "$WORK/c_T_dst_v6.raw"
+narrow_filter_v6 c_T_dst_v6 "$WORK/c_T_dst_v6.raw" "$WORK/c_T_dst_v6" "${CLIENT_DST_MIN_PREFIX6:-64}"
+stage_set_v6 "$MERGED/c-A-dst-v6.txt" /dev/null "$WORK/c_A_dst_v6.raw"
+narrow_filter_v6 c_A_dst_v6 "$WORK/c_A_dst_v6.raw" "$WORK/c_A_dst_v6" "${CLIENT_DST_MIN_PREFIX6:-64}"
+
 nft list table inet xray_router  >/dev/null 2>&1 || die 'inet xray_router missing — run: /etc/init.d/xray reload'
 nft list table inet xray_clients >/dev/null 2>&1 || die 'inet xray_clients missing — run: /etc/init.d/xray reload'
 
-# ------- step 4: snapshot current ----------------------------------------
-#
-# Tolerant: a set may not yet exist during an architecture migration (e.g.
-# first run after introducing a new set in the template but before
-# apply-nft.sh has (re)created the table). Don't abort snapshot in that
-# case — just record the gap as a comment.
 snap_set() {
     if nft list set inet "$1" "$2" 2>/dev/null; then : ; else
         printf '# snapshot: set inet %s %s was absent at snapshot time\n' "$1" "$2"
@@ -217,16 +216,25 @@ snap_set() {
 {
     snap_set xray_router   r_T_v4
     snap_set xray_router   r_A_v4
+    snap_set xray_router   r_T_v6
+    snap_set xray_router   r_A_v6
     snap_set xray_clients  c_bypass_dst_v4
     snap_set xray_clients  c_bypass_src_v4
+    snap_set xray_clients  c_bypass_dst_v6
+    snap_set xray_clients  c_bypass_src_v6
     snap_set xray_clients  c_T_dst_v4
     snap_set xray_clients  c_A_dst_v4
+    snap_set xray_clients  c_T_dst_v6
+    snap_set xray_clients  c_A_dst_v6
 } > "$LAST_GOOD.new.$$"
 mv "$LAST_GOOD.new.$$" "$LAST_GOOD"
 
-# ------- step 5: dry-run path -------------------------------------------
 if [ "$mode" = "--dry-run" ]; then
-    for s in r_T_v4 r_A_v4 c_bypass_dst_v4 c_bypass_src_v4 c_T_dst_v4 c_A_dst_v4; do
+    for s in \
+        r_T_v4 r_A_v4 r_T_v6 r_A_v6 \
+        c_bypass_dst_v4 c_bypass_src_v4 c_bypass_dst_v6 c_bypass_src_v6 \
+        c_T_dst_v4 c_A_dst_v4 c_T_dst_v6 c_A_dst_v6
+    do
         [ -f "$WORK/$s" ] || continue
         n=$(wc -l < "$WORK/$s")
         log "$s would have $n elements"
@@ -234,31 +242,18 @@ if [ "$mode" = "--dry-run" ]; then
     exit 0
 fi
 
-# ------- step 6: apply atomically ----------------------------------------
-#
-# Build one nft script that:
-#   flush set <table> <name>
-#   add element <table> <name> { ip1, ip2, ... }
-# ...for each set. Then nft -f in one shot.
-
 build_add() {
     table="$1"
     name="$2"
     src="$3"
-    # Tolerant to partial-migration state: if the target set is not yet
-    # in kernel (e.g. apply-nft has not run with the latest template),
-    # skip rather than abort the whole transaction. The next
-    # apply-nft → update-sets cycle will catch up.
     if ! nft list set inet "$table" "$name" >/dev/null 2>&1; then
         printf '[update-sets] skip: set inet %s %s absent in kernel (run apply-nft first)\n' \
             "$table" "$name" >&2
         return 0
     fi
-    # Always flush — even for empty sets — so stale entries are cleared.
     printf 'flush set inet %s %s\n' "$table" "$name"
     [ -s "$src" ] || return 0
     printf 'add element inet %s %s { ' "$table" "$name"
-    # comma-separated, multiline tolerated
     first=1
     while IFS= read -r ip; do
         [ -z "$ip" ] && continue
@@ -275,10 +270,16 @@ build_add() {
 {
     build_add xray_router   r_T_v4          "$WORK/r_T_v4"
     build_add xray_router   r_A_v4          "$WORK/r_A_v4"
+    build_add xray_router   r_T_v6          "$WORK/r_T_v6"
+    build_add xray_router   r_A_v6          "$WORK/r_A_v6"
     build_add xray_clients  c_bypass_dst_v4 "$WORK/c_bypass_dst_v4"
     build_add xray_clients  c_bypass_src_v4 "$WORK/c_bypass_src_v4"
+    build_add xray_clients  c_bypass_dst_v6 "$WORK/c_bypass_dst_v6"
+    build_add xray_clients  c_bypass_src_v6 "$WORK/c_bypass_src_v6"
     build_add xray_clients  c_T_dst_v4      "$WORK/c_T_dst_v4"
     build_add xray_clients  c_A_dst_v4      "$WORK/c_A_dst_v4"
+    build_add xray_clients  c_T_dst_v6      "$WORK/c_T_dst_v6"
+    build_add xray_clients  c_A_dst_v6      "$WORK/c_A_dst_v6"
 } > "$WORK/apply.nft"
 
 nft -c -f "$WORK/apply.nft" || die 'nft -c rejected the generated script'
@@ -291,8 +292,11 @@ if ! nft -f "$WORK/apply.nft"; then
     fi
 fi
 
-# ------- step 7: done ----------------------------------------------------
-for s in r_T_v4 r_A_v4 c_bypass_dst_v4 c_bypass_src_v4 c_T_dst_v4 c_A_dst_v4; do
+for s in \
+    r_T_v4 r_A_v4 r_T_v6 r_A_v6 \
+    c_bypass_dst_v4 c_bypass_src_v4 c_bypass_dst_v6 c_bypass_src_v6 \
+    c_T_dst_v4 c_A_dst_v4 c_T_dst_v6 c_A_dst_v6
+do
     [ -f "$WORK/$s" ] || continue
     n=$(wc -l < "$WORK/$s" | awk '{print $1}')
     log "$s applied ($n elements)"

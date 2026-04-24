@@ -10,7 +10,7 @@
       "1.1.1.1",
       "8.8.8.8"
     ],
-    "queryStrategy": "UseIPv4"
+    "queryStrategy": "__XRAY_DNS_QUERY_STRATEGY__"
   },
   "policy": {
     "levels": {

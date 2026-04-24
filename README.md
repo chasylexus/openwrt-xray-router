@@ -40,20 +40,31 @@ Intentionally **not** used: `jq`, `python`, `perl`, `opkg`.
 ### Two circuits
 
 **Circuit 1: the router itself (OUTPUT).**
-`nft table inet xray_router` holds sets `r_T_v4`, `r_A_v4`.
-If `daddr` matches a set — `redirect to :10801` (→ `r-T-in` → outbound T)
-or `:10802` (→ `r-A-in` → outbound A). Everything else goes direct (system path).
+`nft table inet xray_router` holds `r_T_v4` / `r_T_v6` and
+`r_A_v4` / `r_A_v6`. Router-originated TCP whose destination matches a set is
+redirected to the matching loopback inbound:
+
+- IPv4: `:10801` -> `r-T-in` -> outbound `T`; `:10802` -> `r-A-in` -> outbound `A`.
+- IPv6: `:10821` -> `r-T6-in` -> outbound `T`; `:10822` -> `r-A6-in` -> outbound `A`.
+
+Everything else goes by the normal system path. When `ENABLE_IPV6=0`, managed
+nft rules drop global IPv6 before proxy selection while preserving local,
+link-local, ULA, and multicast IPv6 needed for LAN operation.
 
 **Circuit 2: LAN clients (PREROUTING on `br-lan`).**
-`nft table inet xray_clients` holds sets `c_D_v4`, `c_T_v4`, `c_A_v4`.
-- `c_D_v4` → `return` (direct, no Xray hop).
-- `c_T_v4` → `redirect to :10811` (→ `c-T-in` → outbound T).
-- `c_A_v4` → `redirect to :10812` (→ `c-A-in` → outbound A).
-- Default TCP → `redirect to :10813` (→ `c-def-in` → Xray routing by rules).
+`nft table inet xray_clients` uses TPROXY for TCP + UDP so QUIC/HTTP3 is
+handled the same way as TCP:
 
-### Fallback (`c-def-in`)
+- `c_bypass_dst_v4` / `c_bypass_dst_v6` -> return direct by destination.
+- `c_bypass_src_v4` / `c_bypass_src_v6` -> return direct by LAN client source.
+- `c_T_dst_v4` / `c_T_dst_v6` -> TPROXY to `c-T-in` / `c-T6-in` -> outbound `T`.
+- `c_A_dst_v4` / `c_A_dst_v6` -> TPROXY to `c-A-in` / `c-A6-in` -> outbound `A`.
+- Default TCP + UDP -> `c-def-in` / `c-def6-in` -> Xray routing by domain/IP rules.
 
-Xray routing for inbound `c-def-in` is evaluated top to bottom (first match wins).
+### Fallback (`c-def-in` / `c-def6-in`)
+
+Xray routing for default client inbounds is evaluated top to bottom (first
+match wins). IPv4 and IPv6 default traffic share the same logical rule set.
 The concrete service-to-outbound mapping changes over time and is intentionally
 **not** duplicated in this README.
 
@@ -91,20 +102,26 @@ No uid/pid matching is used — it is fragile.
 ### Inbounds
 - `r-T-in` — 10801, dokodemo-door, routed → `T`
 - `r-A-in` — 10802, dokodemo-door, routed → `A`
-- `c-D-in` — 10810, dokodemo-door, routed → `D` *(exists, but not used by base nft — see below)*
+- `r-T6-in` — 10821, dokodemo-door, routed → `T`
+- `r-A6-in` — 10822, dokodemo-door, routed → `A`
 - `c-T-in` — 10811, dokodemo-door, routed → `T`
 - `c-A-in` — 10812, dokodemo-door, routed → `A`
 - `c-def-in` — 10813, dokodemo-door, routed by rules
+- `c-T6-in` — 10831, dokodemo-door, routed → `T`
+- `c-A6-in` — 10832, dokodemo-door, routed → `A`
+- `c-def6-in` — 10833, dokodemo-door, routed by rules
 
 ### nft sets
-- Router: `r_T_v4`, `r_A_v4`
-- Clients: `c_D_v4`, `c_T_v4`, `c_A_v4`
+- Router: `r_T_v4`, `r_A_v4`, `r_T_v6`, `r_A_v6`
+- Clients: `c_bypass_dst_v4`, `c_bypass_src_v4`, `c_bypass_dst_v6`, `c_bypass_src_v6`
+- Clients: `c_T_dst_v4`, `c_A_dst_v4`, `c_T_dst_v6`, `c_A_dst_v6`
 
 ### Lists
-- `r-T-ipv4.txt`, `r-A-ipv4.txt`
+- `r-T-ipv4.txt`, `r-A-ipv4.txt`, `r-T-ipv6.txt`, `r-A-ipv6.txt`
 - `r-T-domains.txt`, `r-A-domains.txt`
-- `c-D-ipv4.txt`, `c-T-ipv4.txt`, `c-A-ipv4.txt`
-- `c-D-domains.txt`, `c-T-domains.txt`, `c-A-domains.txt`
+- `c-bypass-dst-v4.txt`, `c-bypass-src-v4.txt`, `c-bypass-dst-v6.txt`, `c-bypass-src-v6.txt`
+- `c-T-dst-v4.txt`, `c-A-dst-v4.txt`, `c-T-dst-v6.txt`, `c-A-dst-v6.txt`
+- `c-D-*`, `c-T-*`, `c-A-*` legacy list names are still merged so old local overrides are not lost, but current nft routing does not read them.
 
 ## File layout on the router
 
@@ -122,7 +139,7 @@ No uid/pid matching is used — it is fragile.
 ├── lists/
 │   ├── local/                  # manually maintained lists
 │   ├── remote/                 # downloaded remote lists
-│   └── merged/                 # merge + resolve result (IPv4)
+│   └── merged/                 # merged local + remote list inputs
 ├── templates/                  # cached downloaded templates
 ├── state/                      # timestamps, success flags
 ├── bin/                        # helper scripts (copies from repo)
@@ -159,19 +176,56 @@ Secrets never go to GitHub. `.gitignore` covers `secret.env` as a safeguard.
 
 ### Repo-managed nft-stage IP lists
 
-`c-T-dst-v4.txt` and `c-A-dst-v4.txt` are special: they feed the nft
-`c_T_dst_v4` / `c_A_dst_v4` sets directly, so the packet is bound to outbound
-`T` or `A` at the nft stage before `c-def-in` reaches xray domain routing.
+`c-T-dst-v4.txt`, `c-A-dst-v4.txt`, `c-T-dst-v6.txt`, and `c-A-dst-v6.txt`
+are special: they feed the nft `c_T_dst_*` / `c_A_dst_*` sets directly, so the
+packet is bound to outbound `T` or `A` at the nft stage before the default
+Xray domain-routing inbound sees it.
 
-If `LISTS_C_T_DST_V4_URL` / `LISTS_C_A_DST_V4_URL` are left unset and
-`REPO_RAW` is pinned, `fetch-remote-lists.sh` defaults them to:
+If `LISTS_C_T_DST_*_URL` / `LISTS_C_A_DST_*_URL` are left unset and `REPO_RAW`
+is pinned, `fetch-remote-lists.sh` defaults them to:
 
 - `$REPO_RAW/lists/c-T-dst-v4.txt`
 - `$REPO_RAW/lists/c-A-dst-v4.txt`
+- `$REPO_RAW/lists/c-T-dst-v6.txt`
+- `$REPO_RAW/lists/c-A-dst-v6.txt`
 
 That enables the workflow: edit IP/CIDR lists in GitHub -> push -> router cron
 pulls from raw GitHub -> `update-sets.sh` safely rebuilds nft sets. Set a var
 to an explicit empty string to disable the repo-managed default for that file.
+
+`update-sets.sh` now applies width guardrails at staging time:
+
+- `CLIENT_DST_MIN_PREFIX` (default `/24`) for `c-T-dst-v4.txt` / `c-A-dst-v4.txt`
+- `ROUTER_DST_MIN_PREFIX` (default `/20`) for `r-T-ipv4.txt` / `r-A-ipv4.txt`
+- `CLIENT_DST_MIN_PREFIX6` (default `/64`) for `c-T-dst-v6.txt` / `c-A-dst-v6.txt`
+- `ROUTER_DST_MIN_PREFIX6` (default `/32`) for `r-T-ipv6.txt` / `r-A-ipv6.txt`
+
+Bare IPs always pass. CIDRs broader than the configured threshold are dropped
+with a stderr warning, and the cleaned result is what gets applied to live nft
+sets.
+
+Managed `xray/50-routing.json` also gets a width scrub during
+`update-managed-stack.sh`: multi-line literal `ip` / `source` arrays are
+filtered with `XRAY_RULE_MIN_PREFIX` (default `/17`) and
+`XRAY_RULE_MIN_PREFIX6` (default `/32`) before `xray -test`.
+This keeps the current Telegram/WhatsApp ranges intact, while stripping
+accidentally wide networks such as `/12` or `/8` from the managed routing
+template during update.
+
+### IPv6 kill switch
+
+IPv6 is controlled by one local flag in `/etc/xray/secret.env`:
+
+```sh
+ENABLE_IPV6=0  # default: keep managed global IPv6 disabled
+ENABLE_IPV6=1  # enable managed IPv6 proxy/direct routing on next service restart or reboot
+```
+
+With `ENABLE_IPV6=0`, Xray renders IPv4-only DNS/dial strategies, IPv6 policy
+routing is not installed, and managed nft rules drop global IPv6 after local
+IPv6 exceptions. To enable dual-stack behavior, set `ENABLE_IPV6=1` and reboot
+or restart `/etc/init.d/xray`; the init script re-renders managed Xray config
+from the cached templates on start/reload.
 
 ## First run (end-to-end)
 
@@ -303,7 +357,7 @@ nft list table inet xray_clients | head -40
 
 # sets are populated
 nft list set inet xray_router r_T_v4 | head
-nft list set inet xray_clients c_T_v4 | head
+nft list set inet xray_clients c_T_dst_v4 | head
 
 # router exits via T for an address from r_T_v4
 curl -s -m 5 https://ifconfig.me
@@ -322,7 +376,7 @@ In addition to the standard upstream `geosite.dat`, you can load a second geosit
    ```json
    {
      "type": "field",
-     "inboundTag": ["c-def-in"],
+     "inboundTag": ["c-def-in", "c-def6-in"],
      "domain": ["ext:geosite-custom.dat:my-work"],
      "outboundTag": "A"
    }
@@ -331,26 +385,34 @@ In addition to the standard upstream `geosite.dat`, you can load a second geosit
 
 Cron updates the custom file on the same schedule as `geosite.dat` / `geoip.dat`.
 
-## Allow-domains provider (optional)
+## Allow-domains provider (legacy optional)
 
-A third source of domain lists is supported alongside `local/` and `remote/`: a curated provider reachable at a private base URL.
+A third source of domain lists is still supported alongside `local/` and
+`remote/`: a curated provider reachable at a private base URL. In the current
+domain-routing design these downloaded `c-*-domains.txt` files are compatibility
+inputs only; live service routing is defined in `xray/50-routing.json.tpl` and
+`geosite-custom.dat`. Keep this enabled only if you still use those merged
+files for local inspection or future migration.
 
 1. Set `ALLOW_DOMAINS_BASE` in `/etc/xray/secret.env` to the provider's base URL. Leave empty to disable.
 2. Path suffixes are hardcoded in `bin/fetch-allow-domains.sh` (the `ITEMS` table) so the upstream identity stays out of the committed repo. Edit that table to add or remove mappings. Defaults:
    - `Russia/inside-raw.lst` → `c-T-domains.txt`
+   - `Services/google_ai.lst` → `c-T-domains.txt`
+   - `Services/hdrezka.lst` → `c-T-domains.txt`
+   - `Subnets/IPv6/telegram.lst` → `r-T-ipv6.txt`
 3. Downloaded files land at `/etc/xray/lists/remote/allow-<name>.txt` and are unioned into the merged list by `merge-lists.sh` alongside `local/` and `remote/`.
 4. Cron runs `fetch-allow-domains.sh` every 6 hours; it is a silent no-op when `ALLOW_DOMAINS_BASE` is empty.
 
 ## Rule ordering
 
-At both the nft and xray layers, A rules are evaluated before T rules. When a destination IP appears in both `c_A_v4`/`r_A_v4` and `c_T_v4`/`r_T_v4` (e.g. Gemini vs Google overlap on the same Google edge IPs), A wins. Domain-level disambiguation for the fallback `c-def-in` inbound is handled inside `xray/50-routing.json.tpl` where specific domains (gemini, netflix, ...) are matched before generic geosite tags.
+Router nft checks `r_A_*` before `r_T_*`, so `A` wins on router-side IP overlap. Client nft checks `c_T_dst_*` before `c_A_dst_*`, so `T` wins on client per-IP overlap. Domain-level disambiguation for default client traffic is handled inside `xray/50-routing.json.tpl`, where specific domains are matched before generic geosite tags.
 
 ## How to update
 
 Everything is orchestrated by cron. bootstrap installs the managed block automatically (reference copy: `examples/crontab.example`):
 
 - `update-assets.sh` — weekly: update `geosite.dat` / `geoip.dat` / `geosite-custom.dat` (if `GEOSITE_CUSTOM_URL` is set) from `GEOSITE_URL` / `GEOIP_URL` / `GEOSITE_CUSTOM_URL`.
-- `update-managed-stack.sh` — daily: update Xray/nft templates and managed helper scripts from `REPO_RAW`.
+- `update-managed-stack.sh` — daily: update Xray/nft templates, managed helper scripts, and `/etc/init.d/xray` from `REPO_RAW`.
 - `fetch-remote-lists.sh` — every few hours: download remote lists.
 - `fetch-allow-domains.sh` — every 6 hours: download allow-domains provider lists (no-op if `ALLOW_DOMAINS_BASE` is empty).
 - `update-sets.sh` — every 15–30 minutes: merge lists + resolve domains + atomic replace set content.
@@ -403,7 +465,7 @@ nft monitor
 nft list ruleset | grep -E 'xray_(router|clients)|counter'
 
 # actual set contents
-nft list set inet xray_clients c_T_v4
+nft list set inet xray_clients c_T_dst_v4
 
 # trace update-sets resolution
 sh -x /etc/xray/bin/update-sets.sh
@@ -428,9 +490,9 @@ sh -x /etc/xray/bin/update-sets.sh
 
 These are intentional tradeoffs within the requested architecture.
 
-1. **TCP-only in nft redirect.** Uses `redirect to :port` — this is DNAT, which works for TCP. UDP (including QUIC-443) is **not** intercepted in the base setup and goes direct. UDP requires TPROXY with `meta mark` and `ip rule fwmark lookup`, which adds complexity. The TPROXY option is left as a clearly marked TODO in `nft/20-clients-prerouting.nft.tpl`. Most HTTPS sites fall back to TCP+TLS when QUIC is unavailable — TCP-only is sufficient for most practical cases. Tradeoff: simplicity > completeness.
+1. **Router OUTPUT remains TCP-only; clients use TPROXY for TCP + UDP.** Router-originated traffic is redirected with nft `redirect`, which is simple and enough for the router's package/update flows. LAN client traffic uses TPROXY plus fwmark policy routing so UDP/QUIC follows the same proxy decision path as TCP.
 
-2. **`c-D-in` exists but is not used by nft by default.** This lets you explicitly route traffic through Xray with D-outbound (for logging / single sniffing point), but in the base critical path we do `return` in nft for `c_D_v4` — one hop fewer.
+2. **Direct bypass is nft-level, not an Xray inbound.** If a LAN source or destination is in a bypass set, nft returns before Xray. If traffic reaches `c-def-in` / `c-def6-in`, direct-vs-proxy is decided by Xray routing and outbound `D` is an expected direct result, not a leak.
 
 3. **Anti-loop via `sockopt.mark = 0xff`.** We do not bind to Xray's uid because in OpenWrt procd, Xray may run under an unstable uid, which breaks idempotency. mark 0xff on Xray outgoing sockets via `streamSettings.sockopt.mark` is the most direct and portable approach.
 
@@ -453,8 +515,9 @@ These are intentional tradeoffs within the requested architecture.
 /etc/init.d/xray status           # prints PID
 
 # 2. Xray listen ports
-netstat -lntp | grep -E ':1080[01]|1081[0-3]'
-# expected: 10801, 10802, 10810, 10811, 10812, 10813
+netstat -lntp | grep -E ':1080[12]|1081[1-3]|1082[12]|1083[1-3]'
+# expected IPv4: 10801, 10802, 10811, 10812, 10813
+# expected IPv6-capable config: 10821, 10822, 10831, 10832, 10833
 
 # 3. nft tables
 nft list tables | grep -E 'xray_(router|clients)'
@@ -462,14 +525,14 @@ nft list tables | grep -E 'xray_(router|clients)'
 
 # 4. sets non-empty (after update-sets)
 nft list set inet xray_router r_T_v4 | grep -c '^\s*[0-9]'
-nft list set inet xray_clients c_T_v4 | grep -c '^\s*[0-9]'
+nft list set inet xray_clients c_T_dst_v4 | grep -c '^\s*[0-9]'
 # > 0
 
 # 5. Router E2E: take an IP from r-T-ipv4.txt, add to /etc/hosts,
 #    run curl -s https://ifconfig.me — the outgoing IP should change
 
 # 6. LAN client E2E: from a LAN client run curl https://ifconfig.me
-#    for addresses in c_T_v4 — exits via T; in c_A_v4 — via A; direct — your ISP
+#    for addresses in c_T_dst_v4 — exits via T; in c_A_dst_v4 — via A; direct — your ISP
 
 # 7. No loop
 nft list ruleset | grep -E 'mark 0xff.*return'
@@ -477,7 +540,7 @@ nft list ruleset | grep -E 'mark 0xff.*return'
 
 # 8. dnsmasq fill (optional)
 dig @127.0.0.1 google.com
-nft list set inet xray_clients c_T_v4   # a freshly resolved IP should appear
+nft list set inet xray_clients c_T_dst_v4   # useful only if dnsmasq nftset lines are enabled
 ```
 
 ## License

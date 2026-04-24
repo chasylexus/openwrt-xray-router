@@ -17,6 +17,7 @@ NFT_D="$XRAY_ROOT/nft.d"
 DNS_D="$XRAY_ROOT/dnsmasq.d"
 STATE="$XRAY_ROOT/state"
 XRAY_BIN="/usr/local/xray/xray"
+INITD="/etc/init.d/xray"
 SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 log()  { printf '[managed] %s\n' "$*"; }
@@ -48,7 +49,7 @@ mkdir -p "$STATE" "$TPL_DIR/xray" "$TPL_DIR/nft" "$TPL_DIR/dnsmasq"
 stage=$(mktemp -d "$STATE/managed.XXXXXX") || die 'mktemp failed'
 mkdir -p \
     "$stage/xray" "$stage/nft" "$stage/dnsmasq" \
-    "$stage/bin" "$stage/lists" \
+    "$stage/bin" "$stage/lists" "$stage/init.d" \
     "$stage/config.d" "$stage/nft.d" "$stage/dnsmasq.d"
 trap 'rm -rf "$stage"' EXIT INT TERM
 
@@ -77,6 +78,15 @@ dl_list_seed() {
     [ -s "$stage/lists/$fname" ]     || die "empty list seed: $fname"
 }
 
+dl_initd() {
+    url="$REPO_RAW/init.d/xray"
+    $DL "$stage/init.d/xray" "$url" || die "download failed: $url"
+    [ -s "$stage/init.d/xray" ] || die "empty init script: init.d/xray"
+    head -1 "$stage/init.d/xray" | grep -q '^#!' || die "not a shell script: init.d/xray"
+    sh -n "$stage/init.d/xray" || die "init.d/xray failed shell syntax check"
+    chmod 755 "$stage/init.d/xray"
+}
+
 log 'downloading xray templates'
 for f in 00-base.json.tpl 10-inbounds.json.tpl 20-outbounds.json.tpl 50-routing.json.tpl; do
     dl_tpl xray "$f"
@@ -94,12 +104,15 @@ if ! $DL "$stage/dnsmasq/90-nftset.conf.tpl" "$REPO_RAW/dnsmasq/90-nftset.conf.t
 fi
 
 log 'downloading managed helper scripts'
-for f in render-template.sh load-env.sh ensure-crontab.sh apply-iprules.sh apply-nft.sh run-xray.sh merge-lists.sh update-sets.sh update-managed-stack.sh update-all.sh update-assets.sh fetch-remote-lists.sh fetch-allow-domains.sh cap-volatile-logs.sh; do
+for f in render-template.sh render-managed-config.sh load-env.sh sanitize-routing-rules.sh ensure-crontab.sh apply-iprules.sh apply-nft.sh run-xray.sh merge-lists.sh update-sets.sh update-managed-stack.sh update-all.sh update-assets.sh fetch-remote-lists.sh fetch-allow-domains.sh cap-volatile-logs.sh; do
     dl_bin "$f"
 done
 
+log 'downloading init.d service'
+dl_initd
+
 log 'downloading starter lists'
-for f in c-T-dst-v4.txt c-A-dst-v4.txt; do
+for f in r-T-ipv6.txt r-A-ipv6.txt c-T-dst-v4.txt c-A-dst-v4.txt c-T-dst-v6.txt c-A-dst-v6.txt; do
     dl_list_seed "$f"
 done
 
@@ -118,6 +131,13 @@ render_dir() {
 log 'rendering'
 RENDER="$stage/bin/render-template.sh"
 render_dir xray    config.d  json.tpl  json
+if [ -r "$stage/config.d/50-routing.json" ]; then
+    "$stage/bin/sanitize-routing-rules.sh" \
+        "$stage/config.d/50-routing.json" \
+        "$stage/config.d/50-routing.json.sanitized" \
+        || die 'routing sanitization failed'
+    mv "$stage/config.d/50-routing.json.sanitized" "$stage/config.d/50-routing.json"
+fi
 render_dir nft     nft.d     nft.tpl   nft
 # dnsmasq: only if template is non-empty
 if [ -s "$stage/dnsmasq/90-nftset.conf.tpl" ]; then
@@ -153,7 +173,8 @@ if [ -d "$CONF_D" ] || [ -d "$NFT_D" ] || [ -d "$DNS_D" ]; then
     ( cd / && tar czf "$snap.new.$$" \
         "etc/xray/config.d" \
         "etc/xray/nft.d" \
-        "etc/xray/dnsmasq.d" 2>/dev/null ) || true
+        "etc/xray/dnsmasq.d" \
+        "etc/init.d/xray" 2>/dev/null ) || true
     [ -s "$snap.new.$$" ] && mv "$snap.new.$$" "$snap"
 fi
 
@@ -190,13 +211,17 @@ else
     [ -e "$DNS_D/90-nftset.conf" ] && rm -f "$DNS_D/90-nftset.conf"
 fi
 
-for f in render-template.sh load-env.sh ensure-crontab.sh apply-iprules.sh apply-nft.sh run-xray.sh merge-lists.sh update-sets.sh update-managed-stack.sh update-all.sh update-assets.sh fetch-remote-lists.sh fetch-allow-domains.sh cap-volatile-logs.sh; do
+for f in render-template.sh render-managed-config.sh load-env.sh sanitize-routing-rules.sh ensure-crontab.sh apply-iprules.sh apply-nft.sh run-xray.sh merge-lists.sh update-sets.sh update-managed-stack.sh update-all.sh update-assets.sh fetch-remote-lists.sh fetch-allow-domains.sh cap-volatile-logs.sh; do
     cp -p "$stage/bin/$f" "$XRAY_ROOT/bin/$f.new.$$"
     chmod 755 "$XRAY_ROOT/bin/$f.new.$$"
     mv "$XRAY_ROOT/bin/$f.new.$$" "$XRAY_ROOT/bin/$f"
 done
 
-for f in c-T-dst-v4.txt c-A-dst-v4.txt; do
+cp -p "$stage/init.d/xray" "$INITD.new.$$"
+chmod 755 "$INITD.new.$$"
+mv "$INITD.new.$$" "$INITD"
+
+for f in r-T-ipv6.txt r-A-ipv6.txt c-T-dst-v4.txt c-A-dst-v4.txt c-T-dst-v6.txt c-A-dst-v6.txt; do
     [ -e "$XRAY_ROOT/lists/local/$f" ] && continue
     cp -p "$stage/lists/$f" "$XRAY_ROOT/lists/local/$f"
 done

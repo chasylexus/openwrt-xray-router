@@ -7,6 +7,7 @@
 # Remote list URLs come from /etc/xray/secret.env (shell vars). For every list
 # name in the standard naming scheme, you may define:
 #   LISTS_R_T_IPV4_URL=...
+#   LISTS_R_T_IPV6_URL=...
 #   LISTS_R_T_DOMAINS_URL=...
 #   ...etc
 # Any variable that is set to an empty string => that remote file is cleared.
@@ -15,6 +16,8 @@
 # the pinned repository when their vars are UNSET:
 #   LISTS_C_T_DST_V4_URL  -> $REPO_RAW/lists/c-T-dst-v4.txt
 #   LISTS_C_A_DST_V4_URL  -> $REPO_RAW/lists/c-A-dst-v4.txt
+#   LISTS_C_T_DST_V6_URL  -> $REPO_RAW/lists/c-T-dst-v6.txt
+#   LISTS_C_A_DST_V6_URL  -> $REPO_RAW/lists/c-A-dst-v6.txt
 # This keeps the "edit list in repo -> push -> cron pulls from raw GitHub"
 # workflow zero-touch on the router for nft-stage IP routing.
 
@@ -136,16 +139,27 @@ resolve_url() {
 FETCH='
 r-T-ipv4.txt    LISTS_R_T_IPV4_URL
 r-A-ipv4.txt    LISTS_R_A_IPV4_URL
+r-T-ipv6.txt    LISTS_R_T_IPV6_URL
+r-A-ipv6.txt    LISTS_R_A_IPV6_URL
 r-T-domains.txt LISTS_R_T_DOMAINS_URL
 r-A-domains.txt LISTS_R_A_DOMAINS_URL
 c-D-ipv4.txt    LISTS_C_D_IPV4_URL
 c-T-ipv4.txt    LISTS_C_T_IPV4_URL
 c-A-ipv4.txt    LISTS_C_A_IPV4_URL
+c-D-ipv6.txt    LISTS_C_D_IPV6_URL
+c-T-ipv6.txt    LISTS_C_T_IPV6_URL
+c-A-ipv6.txt    LISTS_C_A_IPV6_URL
 c-D-domains.txt LISTS_C_D_DOMAINS_URL
 c-T-domains.txt LISTS_C_T_DOMAINS_URL
 c-A-domains.txt LISTS_C_A_DOMAINS_URL
+c-bypass-dst-v4.txt LISTS_C_BYPASS_DST_V4_URL
+c-bypass-src-v4.txt LISTS_C_BYPASS_SRC_V4_URL
+c-bypass-dst-v6.txt LISTS_C_BYPASS_DST_V6_URL
+c-bypass-src-v6.txt LISTS_C_BYPASS_SRC_V6_URL
 c-T-dst-v4.txt  LISTS_C_T_DST_V4_URL  lists/c-T-dst-v4.txt
 c-A-dst-v4.txt  LISTS_C_A_DST_V4_URL  lists/c-A-dst-v4.txt
+c-T-dst-v6.txt  LISTS_C_T_DST_V6_URL  lists/c-T-dst-v6.txt
+c-A-dst-v6.txt  LISTS_C_A_DST_V6_URL  lists/c-A-dst-v6.txt
 '
 
 # iterate pairs

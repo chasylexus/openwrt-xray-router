@@ -1,6 +1,10 @@
 # c-A-domains.txt
-# Domains to force through A for LAN clients.
-# A = non-RU exit: AI services + Western services that block Russian IPs.
+# LEGACY pre-domain-routing namespace.
+#
+# Current A-by-domain rules live in xray/50-routing.json.tpl. Current per-IP
+# forced A routing uses c-A-dst-v4.txt / c-A-dst-v6.txt.
+# This file is still merged so existing local/remote overrides are not
+# deleted, but current update-sets.sh does not apply it to a live nft set.
 
 # --- OpenAI ---
 openai.com

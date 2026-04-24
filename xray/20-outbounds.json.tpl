@@ -29,7 +29,8 @@
           "spiderX": ""
         },
         "sockopt": {
-          "mark": 255
+          "mark": 255,
+          "domainStrategy": "__XRAY_PROXY_DIALER_DOMAIN_STRATEGY__"
         }
       }
     },
@@ -62,7 +63,8 @@
           "spiderX": ""
         },
         "sockopt": {
-          "mark": 255
+          "mark": 255,
+          "domainStrategy": "__XRAY_PROXY_DIALER_DOMAIN_STRATEGY__"
         }
       }
     },
@@ -70,7 +72,7 @@
       "tag": "D",
       "protocol": "freedom",
       "settings": {
-        "domainStrategy": "UseIPv4"
+        "domainStrategy": "__XRAY_DIRECT_DOMAIN_STRATEGY__"
       },
       "streamSettings": {
         "sockopt": {

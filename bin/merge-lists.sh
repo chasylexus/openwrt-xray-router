@@ -28,10 +28,14 @@ mkdir -p "$M"
 
 LISTS='
 r-T-ipv4.txt r-A-ipv4.txt
+r-T-ipv6.txt r-A-ipv6.txt
 r-T-domains.txt r-A-domains.txt
 c-bypass-dst-v4.txt c-bypass-src-v4.txt
+c-bypass-dst-v6.txt c-bypass-src-v6.txt
 c-T-dst-v4.txt c-A-dst-v4.txt
+c-T-dst-v6.txt c-A-dst-v6.txt
 c-D-ipv4.txt c-T-ipv4.txt c-A-ipv4.txt
+c-D-ipv6.txt c-T-ipv6.txt c-A-ipv6.txt
 c-D-domains.txt c-T-domains.txt c-A-domains.txt
 '
 # NOTE 1: c-T-dst-v4.txt / c-A-dst-v4.txt feed the per-IP forced-outbound

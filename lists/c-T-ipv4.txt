@@ -1,6 +1,10 @@
 # c-T-ipv4.txt
-# IPv4 addresses/CIDRs for CLIENT LAN traffic that should be routed via T.
-# These get nft `redirect to :10811` -> Xray c-T-in -> outbound T.
+# LEGACY pre-domain-routing namespace.
+#
+# Current per-IP forced T routing uses c-T-dst-v4.txt (and c-T-dst-v6.txt).
+# Current domain routing lives in xray/50-routing.json.tpl, not in this file.
+# This file is still merged so existing local overrides are not deleted, but
+# current update-sets.sh does not apply it to a live nft set.
 
 # --- Telegram DC ranges (MTProto connects by IP; DNS alone is not enough) ---
 5.28.192.0/18

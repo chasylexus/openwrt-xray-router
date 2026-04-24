@@ -28,17 +28,20 @@
 # explicit resolution in update-sets.sh, but dnsmasq can pick up subdomain
 # wildcards that our static lists miss.
 
-# Proxy T target tag (c_T_v4)
+# Proxy T target tag (current per-IP nft stage sets)
 #   example: route a domain subtree through T on DNS lookup
-# nftset=/example-t.com/4#inet#xray_clients#c_T_v4
+# nftset=/example-t.com/4#inet#xray_clients#c_T_dst_v4
+# nftset=/example-t.com/6#inet#xray_clients#c_T_dst_v6
 
-# Proxy A target tag (c_A_v4)
+# Proxy A target tag
 #   example: route a domain subtree through A on DNS lookup
-# nftset=/example-a.com/4#inet#xray_clients#c_A_v4
+# nftset=/example-a.com/4#inet#xray_clients#c_A_dst_v4
+# nftset=/example-a.com/6#inet#xray_clients#c_A_dst_v6
 
-# Direct tag (c_D_v4)
-#   example: ensure a domain is resolved into the direct set
-# nftset=/example-direct.com/4#inet#xray_clients#c_D_v4
+# User bypass tag
+#   example: ensure a domain is resolved into the bypass set
+# nftset=/example-direct.com/4#inet#xray_clients#c_bypass_dst_v4
+# nftset=/example-direct.com/6#inet#xray_clients#c_bypass_dst_v6
 
 # Leave this file empty (only comments) in production if you want to rely
 # solely on the static/merged lists and skip the bonus layer altogether.

@@ -14,6 +14,7 @@ XRAY_ROOT="/etc/xray"
 XRAY_BIN="/usr/local/xray/xray"
 CONF_DIR="$XRAY_ROOT/config.d"
 WRAPPER="$XRAY_ROOT/bin/run-xray.sh"
+RENDER_MANAGED="$XRAY_ROOT/bin/render-managed-config.sh"
 
 log() { logger -t xray-init "$1"; printf '[xray-init] %s\n' "$1"; }
 
@@ -25,6 +26,15 @@ _preflight() {
     ls "$CONF_DIR"/*.json >/dev/null 2>&1 \
                           || { log "FATAL: no *.json in $CONF_DIR";       return 1; }
     [ -x "$WRAPPER" ]     || { log "FATAL: $WRAPPER missing";             return 1; }
+    return 0
+}
+
+_render_managed() {
+    [ -x "$RENDER_MANAGED" ] || { log "FATAL: $RENDER_MANAGED missing"; return 1; }
+    "$RENDER_MANAGED" apply >/tmp/xray-render.log 2>&1 || {
+        log "render-managed-config failed; see /tmp/xray-render.log"
+        return 1
+    }
     return 0
 }
 
@@ -46,6 +56,7 @@ _flush_policy() {
 # -------- procd ------------------------------------------------------------
 
 start_service() {
+    _render_managed || exit 1
     _preflight || exit 1
 
     # xray -test before putting anything in nft — fail fast if config broken.
@@ -79,6 +90,7 @@ stop_service() {
 
 reload_service() {
     # Full validate-then-swap reload. Cheaper than a stop/start.
+    _render_managed || return 1
     _preflight || return 1
     if ! "$XRAY_BIN" -test -confdir "$CONF_DIR" >/tmp/xray-test.log 2>&1; then
         log "xray -test failed during reload; keeping old state"

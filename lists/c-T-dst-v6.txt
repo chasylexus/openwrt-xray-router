@@ -1,0 +1,4 @@
+# c-T-dst-v6.txt
+#
+# IPv6 per-destination forced binding to outbound T at the nft stage.
+# Keep this list narrow (/64 and narrower by default; see CLIENT_DST_MIN_PREFIX6).

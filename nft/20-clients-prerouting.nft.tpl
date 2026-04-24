@@ -64,12 +64,22 @@ table inet xray_clients {
         auto-merge
     }
 
+    set c_bypass_dst_v6 {
+        type ipv6_addr
+        flags interval
+        auto-merge
+    }
+
     # Source bypass — "this LAN device is never proxied".
     # Good examples: IoT, game consoles, guest devices with their own VPN,
     # a control laptop you keep on direct for A/B comparison.
     #
     set c_bypass_src_v4 {
         type ipv4_addr
+    }
+
+    set c_bypass_src_v6 {
+        type ipv6_addr
     }
 
     # ---- per-outbound destination sets (NARROW IPs/CIDRs only) ----
@@ -97,6 +107,17 @@ table inet xray_clients {
     }
     set c_A_dst_v4 {
         type ipv4_addr
+        flags interval
+        auto-merge
+    }
+
+    set c_T_dst_v6 {
+        type ipv6_addr
+        flags interval
+        auto-merge
+    }
+    set c_A_dst_v6 {
+        type ipv6_addr
         flags interval
         auto-merge
     }
@@ -142,6 +163,9 @@ table inet xray_clients {
         # table matches both families, so we must exempt v6 explicitly.
         ip6 daddr { ::1/128, fc00::/7, fe80::/10, ff00::/8 } \
             return comment "IPv6 local / link-local / multicast"
+        __NFT_CLIENT_IPV6_DISABLE_RULE__
+        ip6 daddr @c_bypass_dst_v6 counter return comment "user bypass: dst (v6)"
+        ip6 saddr @c_bypass_src_v6 counter return comment "user bypass: src (v6)"
 
         # 5c. Per-outbound by destination IP — TPROXY to a dedicated xray
         #     inbound. xray (xray/50-routing.json.tpl) routes c-T-in -> T
@@ -166,18 +190,34 @@ table inet xray_clients {
         ip daddr @c_A_dst_v4 meta l4proto udp tproxy ip to :10812 \
             meta mark set 0x1 counter accept \
             comment "UDP dst -> c-A-in (per-IP A)"
+        ip6 daddr @c_T_dst_v6 meta l4proto tcp tproxy ip6 to [::1]:10831 \
+            meta mark set 0x1 counter accept \
+            comment "TCP dst -> c-T6-in (per-IP T)"
+        ip6 daddr @c_T_dst_v6 meta l4proto udp tproxy ip6 to [::1]:10831 \
+            meta mark set 0x1 counter accept \
+            comment "UDP dst -> c-T6-in (per-IP T)"
+        ip6 daddr @c_A_dst_v6 meta l4proto tcp tproxy ip6 to [::1]:10832 \
+            meta mark set 0x1 counter accept \
+            comment "TCP dst -> c-A6-in (per-IP A)"
+        ip6 daddr @c_A_dst_v6 meta l4proto udp tproxy ip6 to [::1]:10832 \
+            meta mark set 0x1 counter accept \
+            comment "UDP dst -> c-A6-in (per-IP A)"
 
         # 6. TCP -> c-def-in. xray sniffs HTTP Host / TLS SNI, decides
         #    outbound by domain rule in xray/50-routing.json.tpl.
-        meta l4proto tcp tproxy to :10813 meta mark set 0x1 counter \
+        meta nfproto ipv4 meta l4proto tcp tproxy ip to :10813 meta mark set 0x1 counter \
             comment "TCP -> c-def-in (sniff + domain routing)"
+        meta nfproto ipv6 meta l4proto tcp tproxy ip6 to [::1]:10833 meta mark set 0x1 counter \
+            comment "TCP -> c-def6-in (sniff + domain routing)"
 
         # 7. UDP -> c-def-in. xray sniffs QUIC ClientHello (SNI), decides
         #    the same way. Without this, HTTP/3 (UDP 443) leaks past us
         #    and apps see the real IP — the whole reason we moved off
         #    REDIRECT.
-        meta l4proto udp tproxy to :10813 meta mark set 0x1 counter \
+        meta nfproto ipv4 meta l4proto udp tproxy ip to :10813 meta mark set 0x1 counter \
             comment "UDP -> c-def-in (QUIC sniff)"
+        meta nfproto ipv6 meta l4proto udp tproxy ip6 to [::1]:10833 meta mark set 0x1 counter \
+            comment "UDP -> c-def6-in (QUIC sniff)"
     }
 
     # ---- diagnostics (no-op, readable via `nft list ruleset`) ----
@@ -186,7 +226,11 @@ table inet xray_clients {
         meta mark 0xff counter comment "xray-own (bypass)"
         ip daddr @c_bypass_dst_v4 counter comment "bypass dst hits"
         ip saddr @c_bypass_src_v4 counter comment "bypass src hits"
+        ip6 daddr @c_bypass_dst_v6 counter comment "bypass dst hits (v6)"
+        ip6 saddr @c_bypass_src_v6 counter comment "bypass src hits (v6)"
         ip daddr @c_T_dst_v4 counter comment "per-IP T dst hits"
         ip daddr @c_A_dst_v4 counter comment "per-IP A dst hits"
+        ip6 daddr @c_T_dst_v6 counter comment "per-IP T dst hits (v6)"
+        ip6 daddr @c_A_dst_v6 counter comment "per-IP A dst hits (v6)"
     }
 }

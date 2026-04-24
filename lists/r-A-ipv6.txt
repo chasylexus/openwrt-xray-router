@@ -1,0 +1,4 @@
+# r-A-ipv6.txt
+#
+# Router-side IPv6 destinations that must go through outbound A.
+# One per line. # starts a comment. Whitespace ignored.
