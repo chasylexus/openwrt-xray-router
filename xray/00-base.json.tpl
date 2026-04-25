@@ -6,9 +6,7 @@
   },
   "dns": {
     "servers": [
-      "127.0.0.1",
-      "1.1.1.1",
-      "8.8.8.8"
+      __XRAY_DNS_SERVERS_JSON__
     ],
     "queryStrategy": "__XRAY_DNS_QUERY_STRATEGY__"
   },

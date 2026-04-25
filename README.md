@@ -227,6 +227,19 @@ IPv6 exceptions. To enable dual-stack behavior, set `ENABLE_IPV6=1` and reboot
 or restart `/etc/init.d/xray`; the init script re-renders managed Xray config
 from the cached templates on start/reload.
 
+### Xray DNS fallback order
+
+Xray uses local dnsmasq first, then public DNS fallbacks when it needs to
+resolve a sniffed domain itself. The default is tuned for low direct latency:
+
+```sh
+XRAY_DNS_SERVERS_JSON='"127.0.0.1", {"address":"223.5.5.5","timeoutMs":1000}, {"address":"1.1.1.1","timeoutMs":1000}, {"address":"9.9.9.9","timeoutMs":1000}'
+```
+
+This is a raw JSON fragment for the `dns.servers` array in
+`xray/00-base.json.tpl`, so keep the quotes/braces valid if overriding it in
+`/etc/xray/secret.env`.
+
 ## First run (end-to-end)
 
 ### 1. Fork the repository and edit lists for your needs
