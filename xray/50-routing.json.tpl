@@ -562,7 +562,8 @@
           "domain:electronic.us",
           "domain:cdnst.net",
           "domain:ahrefs.com",
-          "domain:baginya.org"
+          "domain:baginya.org",
+          "domain:sshid.io"
         ],
         "outboundTag": "T"
       },
