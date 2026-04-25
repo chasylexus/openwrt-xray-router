@@ -1,6 +1,19 @@
 {
   "outbounds": [
     {
+      "_comment": "Keep D first intentionally: Xray-generated helper traffic (for example internal DNS bootstrap queries) has no managed inboundTag, so the implicit default outbound must be direct instead of recursively entering T/A.",
+      "tag": "D",
+      "protocol": "freedom",
+      "settings": {
+        "domainStrategy": "__XRAY_DIRECT_DOMAIN_STRATEGY__"
+      },
+      "streamSettings": {
+        "sockopt": {
+          "mark": 255
+        }
+      }
+    },
+    {
       "tag": "T",
       "protocol": "vless",
       "settings": {
@@ -65,18 +78,6 @@
         "sockopt": {
           "mark": 255,
           "domainStrategy": "__XRAY_PROXY_DIALER_DOMAIN_STRATEGY__"
-        }
-      }
-    },
-    {
-      "tag": "D",
-      "protocol": "freedom",
-      "settings": {
-        "domainStrategy": "__XRAY_DIRECT_DOMAIN_STRATEGY__"
-      },
-      "streamSettings": {
-        "sockopt": {
-          "mark": 255
         }
       }
     },

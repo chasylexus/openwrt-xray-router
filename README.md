@@ -99,6 +99,11 @@ No uid/pid matching is used — it is fragile.
 - `D` — direct (freedom)
 - `B` — block (blackhole)
 
+`D` is intentionally first in `xray/20-outbounds.json.tpl`: Xray-generated
+helper traffic, such as internal DNS bootstrap queries, has no managed
+`inboundTag`, so the implicit default outbound must be direct. Client/router
+traffic still follows explicit routing rules by inbound tag and destination.
+
 ### Inbounds
 - `r-T-in` — 10801, dokodemo-door, routed → `T`
 - `r-A-in` — 10802, dokodemo-door, routed → `A`
