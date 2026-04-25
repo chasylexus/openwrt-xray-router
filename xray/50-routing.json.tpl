@@ -233,6 +233,16 @@
       },
 
       {
+        "_comment": "3d. Explicit A suffix overrides not covered by the narrower Google-AI/streaming blocks.",
+        "type": "field",
+        "inboundTag": ["c-def-in", "c-def6-in"],
+        "domain": [
+          "domain:astrill.com"
+        ],
+        "outboundTag": "A"
+      },
+
+      {
         "_comment": "4a. OpenAI / ChatGPT -> T",
         "type": "field",
         "inboundTag": ["c-def-in", "c-def6-in"],
@@ -563,6 +573,8 @@
           "domain:cdnst.net",
           "domain:ahrefs.com",
           "domain:baginya.org",
+          "domain:openwrt.org",
+          "full:downloads.openwrt.org",
           "domain:sshid.io"
         ],
         "outboundTag": "T"

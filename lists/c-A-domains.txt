@@ -141,6 +141,7 @@ jakeroid.com
 technoplaza.net
 
 # --- Misc (non-RU services) ---
+astrill.com
 tuxera.com
 paragon-software.com
 hey.com

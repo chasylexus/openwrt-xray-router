@@ -29,6 +29,10 @@ youtu.be
 ytimg.com
 googlevideo.com
 youtubei.googleapis.com
+iterm2.com
+sshid.io
+openwrt.org
+downloads.openwrt.org
 
 # --- Telegram (domains; IP DC ranges in c-T-ipv4.txt) ---
 telegram.org
