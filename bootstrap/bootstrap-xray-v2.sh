@@ -496,14 +496,14 @@ chmod 755 "$INITD"
 
 # ------- 6. secret.env.example ------------------------------------------
 
-if [ ! -e "$XRAY_ROOT/secret.env.example" ]; then
-    tmp="$XRAY_ROOT/.secret.env.example.new.$$"
-    if $DL "$tmp" "$REPO_RAW/examples/secret.env.example"; then
-        mv "$tmp" "$XRAY_ROOT/secret.env.example"
-    else
-        rm -f "$tmp"
-        log 'WARN: could not fetch secret.env.example'
-    fi
+tmp="$XRAY_ROOT/.secret.env.example.new.$$"
+if $DL "$tmp" "$REPO_RAW/examples/secret.env.example"; then
+    [ -s "$tmp" ] || { rm -f "$tmp"; die 'empty download: examples/secret.env.example'; }
+    mv "$tmp" "$XRAY_ROOT/secret.env.example"
+    chmod 600 "$XRAY_ROOT/secret.env.example"
+else
+    rm -f "$tmp"
+    log 'WARN: could not fetch secret.env.example'
 fi
 
 # ------- 7. pin REPO_RAW in /etc/xray/repo.env ---------------------------

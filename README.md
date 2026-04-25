@@ -276,7 +276,7 @@ Bootstrap will:
 - if interactive and `secret.env` is missing/incomplete — offer to create/fill it with `T_VLESS_URL` / `A_VLESS_URL`;
 - prefer `REPO_RAW` downloads first and postpone OpenWrt package feeds until the last responsible moment;
 - **not** force-render or restart Xray in default ensure mode;
-- if `secret.env` is absent — place `/etc/xray/secret.env.example` alongside it and print instructions.
+- refresh `/etc/xray/secret.env.example` from the repo every run, without touching your real `/etc/xray/secret.env`.
 
 ### 4. Bootstrap modes
 
