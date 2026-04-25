@@ -130,7 +130,6 @@ protonmail.com
 amnezia.org
 tunnelbear.com
 redshieldvpn.com
-sshid.io
 
 # --- Speedtest ---
 speedtest.net
