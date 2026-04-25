@@ -253,17 +253,26 @@ You can also start with the default examples.
 
 ### 2. On a new router, as root
 
-Preferred path for a fresh router:
+Recommended deterministic path for a fresh router:
 
 ```sh
 BOOTSTRAP_URL='https://raw.githubusercontent.com/chasylexus/openwrt-xray-router/refs/heads/main/bootstrap/bootstrap-xray-v2.sh'
 uclient-fetch -O /tmp/bootstrap.sh "$BOOTSTRAP_URL" \
   || wget -O /tmp/bootstrap.sh "$BOOTSTRAP_URL"
+sh /tmp/bootstrap.sh
+cp /etc/xray/secret.env.example /etc/xray/secret.env
+vi /etc/xray/secret.env
+chmod 600 /etc/xray/secret.env
 sh /tmp/bootstrap.sh --force-init
 ```
 
-That path is intentionally split in two network phases:
-- Phase 1 uses `REPO_RAW` first. bootstrap pulls repo files, can prompt for `T_VLESS_URL` / `A_VLESS_URL`, writes `secret.env`, and prepares the managed stack.
+Why this order is recommended:
+- Step 1 (`sh /tmp/bootstrap.sh`) lays down the managed stack, helper scripts, starter lists, init script, cron block, and `secret.env.example`, but does **not** force a render/apply yet.
+- Step 2 creates and fills `/etc/xray/secret.env`, which is required for the stack to know how to reach `T` and `A`.
+- Step 3 (`sh /tmp/bootstrap.sh --force-init`) reruns bootstrap in "make it ready" mode and only performs the full apply once `secret.env` is complete/valid.
+
+That full-init path is intentionally split in two network phases:
+- Phase 1 uses `REPO_RAW` first. bootstrap pulls repo files, prepares the managed stack, and validates `secret.env`.
 - Phase 2 touches OpenWrt package feeds only when needed. If the router already has the critical pre-route tools (`nft`, `ip`, `uci`, `xray`, downloader), bootstrap defers package feeds until after routing is up. If one of those critical pieces is missing, feed access becomes unavoidable before routing.
 
 ### 3. On the router, as root:
@@ -282,9 +291,11 @@ wget -O /tmp/bootstrap.sh 'https://raw.githubusercontent.com/chasylexus/openwrt-
 sh /tmp/bootstrap.sh --force-init 'https://raw.githubusercontent.com/<owner>/<repo>/refs/heads/<branch>'
 ```
 
-In interactive mode bootstrap asks only for:
+In interactive mode bootstrap can also ask only for:
 - `T_VLESS_URL` and `A_VLESS_URL` with neutral examples
 - pressing Enter on `A_VLESS_URL` reuses `T_VLESS_URL`
+
+That interactive path is convenient, but the explicit `secret.env` flow above is the most predictable way to reproduce the same behavior on another router.
 
 Bootstrap will:
 - create `/etc/xray/{config.d,nft.d,lists/{local,remote,merged},templates,state,bin,dnsmasq.d}`;
@@ -311,6 +322,8 @@ chmod 600 /etc/xray/secret.env
 ```
 
 Fill in the URLs and T/A connection details.
+
+If you want a second router to behave exactly like the first one, this is the main local file that must contain the same values. In the normal GitHub-driven workflow you do **not** need to hand-copy `/etc/xray/lists/local/*`: bootstrap seeds those files once, and the live behavior is then driven by the repo templates plus the remote lists fetched from GitHub.
 
 You can either:
 - paste full `T_VLESS_URL` / `A_VLESS_URL` links, or
