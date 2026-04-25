@@ -58,6 +58,16 @@
       },
 
       {
+        "_comment": "1b0. Turkish commercial domains -> T. Keep this before the carrier/direct suffix block so every *.com.tr domain follows the proxy request.",
+        "type": "field",
+        "inboundTag": ["c-def-in", "c-def6-in"],
+        "domain": [
+          "domain:com.tr"
+        ],
+        "outboundTag": "T"
+      },
+
+      {
         "_comment": "1b1. Apple / iCloud / Wi-Fi-portal / carrier suffixes — direct. Keep these outside the proxy even if future geosite tags widen.",
         "type": "field",
         "inboundTag": ["c-def-in", "c-def6-in"],
