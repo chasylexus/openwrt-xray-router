@@ -406,12 +406,18 @@ configure_tailscale_underlay() {
     uci set tailscale.settings.always_use_derp='1'
     uci commit tailscale
 
+    # Remove stale package START links before enabling our START=99 init script.
+    /etc/init.d/tailscale disable
     /etc/init.d/tailscale enable
     /etc/init.d/tailscale-underlay-watchdog enable
     /etc/init.d/tailscale-underlay-watchdog restart
 }
 
 disable_legacy_stack() {
+    if [ -x /etc/init.d/sing-box ]; then
+        /etc/init.d/sing-box stop || true
+        /etc/init.d/sing-box disable || true
+    fi
     if [ -x /etc/init.d/xray ]; then
         /etc/init.d/xray stop || true
         /etc/init.d/xray disable || true
