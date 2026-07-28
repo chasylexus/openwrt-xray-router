@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+SERVICE="trusttunnel-client-t.service"
+SOCKS_PROXY="127.0.0.1:1082"
+CHECK_URL="https://ipinfo.io/country"
+
+if systemctl is-active --quiet "$SERVICE" &&
+    curl -4 -fsS --socks5-hostname "$SOCKS_PROXY" \
+        --connect-timeout 8 --max-time 20 \
+        "$CHECK_URL" -o /dev/null; then
+    exit 0
+fi
+
+logger -t trusttunnel-client-t-healthcheck \
+    "SOCKS health check failed; restarting $SERVICE"
+systemctl restart "$SERVICE"

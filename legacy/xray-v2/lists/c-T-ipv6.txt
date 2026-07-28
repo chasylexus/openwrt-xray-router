@@ -1,0 +1,3 @@
+# c-T-ipv6.txt
+#
+# LEGACY pre-7f118eb namespace. Kept only so existing overrides are not lost.

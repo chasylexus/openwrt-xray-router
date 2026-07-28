@@ -1,0 +1,31 @@
+# r-T-domains.txt
+# Domains that should be routed from the ROUTER ITSELF via T.
+# update-sets.sh resolves each via nslookup and adds IPv4 to r_T_v4.
+# One per line. # starts a comment.
+#
+# Keep this list LEAN — the router only needs outbound connectivity for
+# update scripts, time sync, alerts, and curl-based diagnostics. Piling
+# client-side domains here is pointless (router does not open Gmail).
+
+# Google (for diagnostics / connectivity checks)
+google.com
+www.google.com
+
+# GitHub (for update-managed-stack.sh / update-assets.sh if provider
+# blocks github raw)
+github.com
+raw.githubusercontent.com
+release-assets.githubusercontent.com
+objects.githubusercontent.com
+codeload.github.com
+
+# Telegram (if you use it for router notifications)
+telegram.org
+t.me
+api.telegram.org
+
+# OpenWrt updates (packages, sysupgrade images) — downloads.openwrt.org
+# can be flaky / throttled on some RU ISPs; push it through T to stay
+# reliable for apk/opkg and firmware fetches.
+downloads.openwrt.org
+openwrt.org

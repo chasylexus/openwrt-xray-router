@@ -1,0 +1,34 @@
+#!/bin/sh
+set -eu
+
+CERTBOT="$(command -v certbot || true)"
+TRUSTTUNNEL_HOSTS="/opt/trusttunnel/hosts.toml"
+
+if [ -z "$CERTBOT" ] || [ ! -x "$CERTBOT" ]; then
+    logger -t trusttunnel-cert-renew "certbot executable not found"
+    exit 1
+fi
+
+if [ -r "$TRUSTTUNNEL_HOSTS" ]; then
+    endpoint_hostname="$(sed -n 's/^[[:space:]]*hostname[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$TRUSTTUNNEL_HOSTS" | head -n 1)"
+    resolved_ipv4="$(getent ahostsv4 "$endpoint_hostname" 2>/dev/null | awk '{ print $1 }' | sort -u)"
+    local_ipv4="$(ip -4 -o addr show scope global 2>/dev/null | awk '{ sub(/\/.*/, "", $4); print $4 }')"
+    address_matches=0
+
+    for address in $resolved_ipv4; do
+        for local_address in $local_ipv4; do
+            if [ "$address" = "$local_address" ]; then
+                address_matches=1
+                break 2
+            fi
+        done
+    done
+
+    if [ -z "$endpoint_hostname" ] || [ "$address_matches" -ne 1 ]; then
+        logger -p daemon.err -t trusttunnel-cert-renew \
+            "No-IP hostname does not resolve to this server; manual action required"
+        exit 1
+    fi
+fi
+
+exec "$CERTBOT" renew --quiet

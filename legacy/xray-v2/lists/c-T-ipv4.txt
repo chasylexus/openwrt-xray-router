@@ -1,0 +1,18 @@
+# c-T-ipv4.txt
+# LEGACY pre-domain-routing namespace.
+#
+# Current per-IP forced T routing uses c-T-dst-v4.txt (and c-T-dst-v6.txt).
+# Current domain routing lives in xray/50-routing.json.tpl, not in this file.
+# This file is still merged so existing local overrides are not deleted, but
+# current update-sets.sh does not apply it to a live nft set.
+
+# --- Telegram DC ranges (MTProto connects by IP; DNS alone is not enough) ---
+5.28.192.0/18
+91.105.192.0/23
+91.108.4.0/22
+91.108.8.0/21
+91.108.16.0/21
+91.108.56.0/22
+95.161.64.0/20
+149.154.160.0/20
+185.76.151.0/24

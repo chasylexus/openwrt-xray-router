@@ -1,0 +1,10 @@
+#!/bin/sh
+
+path='/usr/local/bin/sing-box'
+config='/etc/sysupgrade.conf'
+
+mkdir -p /etc
+touch "$config"
+grep -Fqx "$path" "$config" 2>/dev/null || printf '%s\n' "$path" >>"$config"
+
+exit 0
