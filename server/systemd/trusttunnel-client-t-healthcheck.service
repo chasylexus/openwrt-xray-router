@@ -1,0 +1,8 @@
+[Unit]
+Description=Check the TrustTunnel T outbound SOCKS listener
+After=network-online.target trusttunnel-client-t.service
+Wants=network-online.target trusttunnel-client-t.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/trusttunnel-client-t-healthcheck

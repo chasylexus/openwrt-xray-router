@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+
+# TrustTunnel loads its TLS certificate at process start.
+systemctl try-restart trusttunnel.service

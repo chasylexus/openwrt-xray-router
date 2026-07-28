@@ -1,0 +1,50 @@
+#!/bin/sh /etc/rc.common
+
+START=94
+USE_PROCD=1
+
+PROG="/opt/trusttunnel/trusttunnel_client"
+CONF="/etc/trusttunnel/router-client.toml"
+
+wait_network() {
+    local i gw dev
+
+    for i in $(seq 1 90); do
+        gw="$(ip -4 route show default 2>/dev/null | awk '/default/ { print $3; exit }')"
+        dev="$(ip -4 route show default 2>/dev/null | awk '/default/ { for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }')"
+        if [ -n "$gw" ] && [ -n "$dev" ] && ip -4 addr show "$dev" 2>/dev/null | grep -q ' inet '; then
+            break
+        fi
+        sleep 1
+    done
+
+    if [ -n "$gw" ]; then
+        for i in $(seq 1 15); do
+            ping -c 1 -W 1 "$gw" >/dev/null 2>&1 && return 0
+            sleep 1
+        done
+    fi
+}
+
+start_service() {
+    if [ ! -x "$PROG" ]; then
+        echo "missing executable: $PROG" >&2
+        return 1
+    fi
+    if [ ! -r "$CONF" ]; then
+        echo "missing config: $CONF" >&2
+        return 1
+    fi
+    if grep -q 'REPLACE_WITH_' "$CONF"; then
+        echo "refusing to start: fill placeholders in $CONF first" >&2
+        return 1
+    fi
+    wait_network
+
+    procd_open_instance
+    procd_set_param command "$PROG" -c "$CONF" -l warn
+    procd_set_param respawn 3600 10 -1
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_close_instance
+}

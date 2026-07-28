@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodically check the TrustTunnel T outbound
+
+[Timer]
+OnBootSec=2m
+OnUnitActiveSec=3m
+RandomizedDelaySec=30s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

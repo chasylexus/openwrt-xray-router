@@ -1,0 +1,31 @@
+# Router-side TrustTunnel client template.
+# Fill this file only on the router at /etc/trusttunnel/router-client.toml.
+# Do not commit a filled copy.
+
+loglevel = "warn"
+vpn_mode = false
+killswitch_enabled = false
+killswitch_allow_ports = []
+post_quantum_group_enabled = false
+exclusions = []
+dns_upstreams = ["https://dns.adguard-dns.com/dns-query"]
+
+[endpoint]
+# Endpoint and credentials are intentionally placeholders.
+# Keep real values only on the router.
+hostname = "REPLACE_WITH_TT_HOSTNAME"
+addresses = ["REPLACE_WITH_TT_ENDPOINT_IPV4:443"]
+has_ipv6 = false
+username = "REPLACE_WITH_TT_USERNAME"
+password = "REPLACE_WITH_TT_PASSWORD"
+client_random = "REPLACE_WITH_TT_CLIENT_RANDOM"
+skip_verification = false
+certificate = ""
+# This client build accepts the DoH URL in dns_upstreams while upstream_protocol
+# stays unchanged. Do not set upstream_protocol to "https" or "doh".
+dns_upstreams = ["https://dns.adguard-dns.com/dns-query"]
+upstream_protocol = "tcp"
+anti_dpi = true
+
+[listener.socks]
+address = "127.0.0.1:11080"

@@ -1,0 +1,135 @@
+#!/bin/sh /etc/rc.common
+
+START=90
+STOP=10
+
+NTP_FALLBACK_HOST="time.cloudflare.com"
+STATE_FILE="/tmp/router-clock-bootstrap.ok"
+LOG_FILE="/tmp/router-clock-bootstrap.log"
+MAX_NETWORK_WAIT=90
+MAX_PEERS=4
+
+log_notice() {
+    logger -t router-clock-bootstrap "$*"
+}
+
+detect_upstream_dns() {
+    local file value
+
+    for file in /tmp/resolv.conf.d/resolv.conf.auto /tmp/resolv.conf.auto; do
+        [ -r "$file" ] || continue
+        value="$(awk '/^nameserver[ \t]+[0-9.]+/ { print $2; exit }' "$file")"
+        [ -n "$value" ] || continue
+        [ "$value" = "127.0.0.1" ] && continue
+        printf '%s\n' "$value"
+        return 0
+    done
+
+    ip -4 route show default 2>/dev/null | awk '/default/ { print $3; exit }'
+}
+
+wait_for_wan() {
+    local elapsed=0 gateway device
+
+    while [ "$elapsed" -lt "$MAX_NETWORK_WAIT" ]; do
+        gateway="$(ip -4 route show default 2>/dev/null | awk '/default/ { print $3; exit }')"
+        device="$(ip -4 route show default 2>/dev/null | awk '
+            /default/ {
+                for (i = 1; i <= NF; i++) {
+                    if ($i == "dev") {
+                        print $(i + 1)
+                        exit
+                    }
+                }
+            }
+        ')"
+        if [ -n "$gateway" ] &&
+            [ -n "$device" ] &&
+            ip -4 addr show "$device" 2>/dev/null | grep -q ' inet ' &&
+            ping -c 1 -W 1 "$gateway" >/dev/null 2>&1; then
+            return 0
+        fi
+        elapsed=$((elapsed + 1))
+        sleep 1
+    done
+
+    return 1
+}
+
+is_ipv4() {
+    printf '%s\n' "$1" | grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}$'
+}
+
+resolve_ipv4_direct() {
+    local host dns
+
+    host="$1"
+    dns="$2"
+    nslookup "$host" "$dns" 2>/dev/null | awk -v dns="$dns" '
+        $1 == "Address:" {
+            ip = $2
+            sub(/:[0-9]+$/, "", ip)
+            if (ip != dns && ip ~ /^([0-9]+\.){3}[0-9]+$/) {
+                print ip
+                exit
+            }
+        }
+    '
+}
+
+sync_clock() {
+    local upstream_dns ntp_hosts host peer peer_count
+
+    [ -s "$STATE_FILE" ] && return 0
+    : >"$LOG_FILE"
+
+    if ! wait_for_wan; then
+        log_notice "WAN did not become ready within ${MAX_NETWORK_WAIT}s"
+        return 1
+    fi
+
+    upstream_dns="$(detect_upstream_dns)"
+    if ! is_ipv4 "$upstream_dns"; then
+        log_notice "no direct upstream IPv4 DNS server available"
+        return 1
+    fi
+
+    ntp_hosts="$(uci -q get system.ntp.server || true)"
+    ntp_hosts="$ntp_hosts $NTP_FALLBACK_HOST"
+    set -- /usr/sbin/ntpd -n -q
+    peer_count=0
+
+    for host in $ntp_hosts; do
+        if is_ipv4 "$host"; then
+            peer="$host"
+        else
+            peer="$(resolve_ipv4_direct "$host" "$upstream_dns")"
+        fi
+        is_ipv4 "$peer" || continue
+        set -- "$@" -p "$peer"
+        peer_count=$((peer_count + 1))
+        [ "$peer_count" -ge "$MAX_PEERS" ] && break
+    done
+
+    if [ "$peer_count" -eq 0 ]; then
+        log_notice "direct DNS $upstream_dns returned no IPv4 NTP peers"
+        return 1
+    fi
+
+    if "$@" >>"$LOG_FILE" 2>&1; then
+        date +%s >"$STATE_FILE"
+        log_notice "clock synchronized directly using WAN DNS $upstream_dns"
+        return 0
+    fi
+
+    log_notice "direct NTP synchronization failed; see $LOG_FILE"
+    return 1
+}
+
+start() {
+    sync_clock
+}
+
+boot() {
+    sync_clock
+}

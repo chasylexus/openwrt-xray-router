@@ -1,0 +1,8 @@
+[Unit]
+Description=Renew certificates used by TrustTunnel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/trusttunnel-cert-renew
