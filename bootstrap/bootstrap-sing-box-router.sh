@@ -353,6 +353,19 @@ sing_box_config_ready() {
 }
 
 configure_firewall() {
+    rule_index=0
+    while uci -q get "firewall.@rule[$rule_index]" >/dev/null 2>&1; do
+        rule_name="$(uci -q get "firewall.@rule[$rule_index].name" || true)"
+        case "$rule_name" in
+            Allow-IPSec-ESP|Allow-ISAKMP)
+                uci -q delete "firewall.@rule[$rule_index]"
+                ;;
+            *)
+                rule_index=$((rule_index + 1))
+                ;;
+        esac
+    done
+
     uci set firewall.singbox_tun='zone'
     uci set firewall.singbox_tun.name='singbox_tun'
     uci set firewall.singbox_tun.input='REJECT'

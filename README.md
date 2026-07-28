@@ -206,6 +206,9 @@ listener and the sing-box test listener are localhost-only:
 
 No external SOCKS or mixed proxy port is opened by this repo.
 
+Because this router does not terminate or forward IPsec, the bootstrap removes
+the stock `Allow-IPSec-ESP` and `Allow-ISAKMP` WAN-to-LAN exceptions.
+
 The Tailscale proxy, selector API, DNS listener, and test proxy are also
 localhost-only:
 
