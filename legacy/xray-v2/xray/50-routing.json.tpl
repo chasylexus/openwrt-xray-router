@@ -397,6 +397,7 @@
           "geosite:youtube",
           "full:youtubei.googleapis.com",
           "geosite:spotify",
+          "geosite:lastfm",
           "geosite:facebook",
           "geosite:instagram",
           "geosite:whatsapp",
