@@ -80,6 +80,7 @@
           "ai-not-cn",
           "youtube",
           "spotify",
+          "lastfm",
           "facebook",
           "instagram",
           "whatsapp",
@@ -351,6 +352,14 @@
       },
       {
         "type": "remote",
+        "tag": "lastfm",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-lastfm.srs",
+        "update_interval": "2h",
+        "download_detour": "tt-t"
+      },
+      {
+        "type": "remote",
         "tag": "facebook",
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-facebook.srs",
@@ -564,6 +573,7 @@
           "ai-not-cn",
           "youtube",
           "spotify",
+          "lastfm",
           "facebook",
           "instagram",
           "whatsapp",

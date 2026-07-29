@@ -53,6 +53,8 @@ REPLACE_WITH_RULESET_BASE
 The router also uses ready-made sing-box rule sets from SagerNet
 `sing-geosite`.
 
+Last.fm uses SagerNet's `geosite-lastfm.srs` rule-set and routes through `tt-t`.
+
 The active sing-box config sets `update_interval: "2h"` on every remote rule
 set, so rule updates are handled by sing-box itself. There is no separate Xray
 cron path in the active stack.
