@@ -42,6 +42,40 @@ downloads.openwrt.org
 github.com
 patreonusercontent.com
 
+# --- FatSecret international sites and first-party assets ---
+fatsecret.com
+fatsecret.com.ar
+fatsecret.com.au
+fatsecret.com.br
+fatsecret.com.mx
+fatsecret.com.sg
+fatsecret.com.tr
+fatsecret.ca
+fatsecret.cl
+fatsecret.cn
+fatsecret.co.id
+fatsecret.co.in
+fatsecret.co.nz
+fatsecret.co.uk
+fatsecret.co.za
+fatsecret.at
+fatsecret.be
+fatsecret.ch
+fatsecret.de
+fatsecret.dk
+fatsecret.es
+fatsecret.fi
+fatsecret.fr
+fatsecret.it
+fatsecret.jp
+fatsecret.kr
+fatsecret.nl
+fatsecret.pl
+fatsecret.pt
+fatsecret.ru
+fatsecret.se
+ftscrt.com
+
 # --- Telegram (domains; IP DC ranges in c-T-ipv4.txt) ---
 telegram.org
 t.me
