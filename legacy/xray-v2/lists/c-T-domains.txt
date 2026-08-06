@@ -27,6 +27,10 @@ googleusercontent.com
 ggpht.com
 gstatic.com
 
+# --- Suno AI music ---
+suno.ai
+suno.com
+
 # --- YouTube ---
 youtube.com
 youtube.ru

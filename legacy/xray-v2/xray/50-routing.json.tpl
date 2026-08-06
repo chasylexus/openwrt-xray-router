@@ -336,6 +336,8 @@
           "domain:runwayml.com",
           "domain:elevenlabs.io",
           "domain:stability.ai",
+          "domain:suno.ai",
+          "domain:suno.com",
           "domain:langchain.com",
           "domain:pinecone.io",
           "domain:weaviate.io",
