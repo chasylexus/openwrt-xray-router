@@ -549,7 +549,7 @@
         "domain_regex": [
           "(^|\\.)voidboost\\.[a-z0-9-]+$"
         ],
-        "outbound": "tt-t"
+        "outbound": "direct"
       },
       {
         "rule_set": [
