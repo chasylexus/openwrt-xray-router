@@ -157,7 +157,6 @@ sci-hub.se
 # --- RU-blocked streaming ---
 hdrezka.ac
 rezka.ag
-voidboost.cc
 filmix.ac
 kino.pub
 kinopub.online

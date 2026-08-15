@@ -62,6 +62,8 @@ cron path in the active stack.
 Current high-level routing:
 
 - `manual-d` stays direct.
+- `voidboost.*` stays direct because its CDN is reachable on the WAN path but
+  stalls during the TLS handshake through the current TrustTunnel exit.
 - `ads-all` is blocked.
 - `manual-t-priority`, `manual-google-ai`, `manual-t`, `manual-t-late`, and the
   T-side ready-made lists go to `tt-t`.

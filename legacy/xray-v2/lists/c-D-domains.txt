@@ -51,3 +51,7 @@ ru
 
 # Personal direct override
 kvk.com
+
+# Voidboost CDN (the current proxy exit stalls during TLS)
+voidboost.cc
+voidboost.one
