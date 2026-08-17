@@ -138,18 +138,6 @@
       },
 
       {
-        "_comment": "1b3. Voidboost CDN -> direct. The current proxy exit stalls during TLS while the WAN path is healthy.",
-        "type": "field",
-        "inboundTag": ["c-def-in", "c-def6-in"],
-        "domain": [
-          "domain:voidboost.cc",
-          "domain:voidboost.one",
-          "regexp:(^|\\.)voidboost\\.[a-z0-9-]+$"
-        ],
-        "outboundTag": "D"
-      },
-
-      {
         "_comment": "1c. WhatsApp domains before ads. Keeps chat/media flows from falling into geosite:category-ads-all false positives.",
         "type": "field",
         "inboundTag": ["c-def-in", "c-def6-in"],
@@ -559,6 +547,9 @@
           "domain:sci-hub.se",
           "domain:hdrezka.ac",
           "domain:rezka.ag",
+          "domain:voidboost.cc",
+          "domain:voidboost.one",
+          "regexp:(^|\\.)voidboost\\.[a-z0-9-]+$",
           "domain:filmix.ac",
           "geosite:kinopub",
           "domain:kinopub.me",

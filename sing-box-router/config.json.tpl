@@ -201,6 +201,16 @@
       ],
       "default": "tt-t",
       "interrupt_exist_connections": true
+    },
+    {
+      "type": "selector",
+      "tag": "voidboost-egress",
+      "outbounds": [
+        "tt-t",
+        "direct"
+      ],
+      "default": "tt-t",
+      "interrupt_exist_connections": true
     }
   ],
   "route": {
@@ -549,7 +559,7 @@
         "domain_regex": [
           "(^|\\.)voidboost\\.[a-z0-9-]+$"
         ],
-        "outbound": "direct"
+        "outbound": "voidboost-egress"
       },
       {
         "rule_set": [
