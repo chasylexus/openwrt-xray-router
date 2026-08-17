@@ -413,6 +413,11 @@ configure_tailscale_underlay() {
     /etc/init.d/tailscale-underlay-watchdog restart
 }
 
+configure_voidboost_egress() {
+    /etc/init.d/voidboost-egress-watchdog enable
+    /etc/init.d/voidboost-egress-watchdog restart
+}
+
 disable_legacy_stack() {
     if [ -x /etc/init.d/sing-box ]; then
         /etc/init.d/sing-box stop || true
@@ -475,6 +480,7 @@ apply_stack() {
     log "switching DNS to sing-box after service health check"
     configure_dnsmasq
     configure_tailscale_underlay
+    configure_voidboost_egress
     [ -x /root/bin/confirm-router-cutover.sh ] && /root/bin/confirm-router-cutover.sh || true
 }
 
@@ -495,6 +501,7 @@ backup_path /etc/init.d/trusttunnel-client
 backup_path /etc/init.d/router-clock-bootstrap
 backup_path /etc/init.d/tailscale
 backup_path /etc/init.d/tailscale-underlay-watchdog
+backup_path /etc/init.d/voidboost-egress-watchdog
 backup_path /etc/init.d/xray
 
 apk_add_best_effort ca-bundle curl kmod-tun nftables ip-full tailscale
@@ -521,12 +528,14 @@ install_repo_file init.d/trusttunnel-client /etc/init.d/trusttunnel-client 755
 install_repo_file init.d/router-clock-bootstrap /etc/init.d/router-clock-bootstrap 755
 install_repo_file init.d/tailscale /etc/init.d/tailscale 755
 install_repo_file init.d/tailscale-underlay-watchdog /etc/init.d/tailscale-underlay-watchdog 755
+install_repo_file init.d/voidboost-egress-watchdog /etc/init.d/voidboost-egress-watchdog 755
 install_repo_file bin/rollback-to-legacy-xray.sh /root/bin/rollback-to-legacy-xray.sh 700
 install_repo_file bin/arm-router-rollback.sh /root/bin/arm-router-rollback.sh 700
 install_repo_file bin/confirm-router-cutover.sh /root/bin/confirm-router-cutover.sh 700
 install_repo_file bin/configure-local-router-access.sh /root/bin/configure-local-router-access.sh 700
 install_repo_file bin/refresh-sing-box-rules.sh /root/bin/refresh-sing-box-rules.sh 700
 install_repo_file bin/tailscale-underlay-watchdog.sh /root/bin/tailscale-underlay-watchdog.sh 700
+install_repo_file bin/voidboost-egress-watchdog.sh /root/bin/voidboost-egress-watchdog.sh 700
 install_repo_file bootstrap/bootstrap-sing-box-router.sh /root/bin/bootstrap-sing-box-router.sh 700
 
 mkdir -p "$TT_ROOT"

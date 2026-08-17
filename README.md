@@ -41,6 +41,11 @@ failures, and returns to `tt-t` after two successful checks. Tailscale
 coordination and DERP domains from LAN clients use the same selector.
 `100.64.0.0/10` and private IPv6 ranges stay excluded from the sing-box TUN.
 
+Voidboost uses a separate selector so its player requests normally share the
+same `tt-t` exit as Rezka. A dedicated watchdog probes the real Voidboost HTTPS
+endpoint through TrustTunnel, falls back to `direct` after three consecutive
+TLS failures, and returns to `tt-t` after two successful checks.
+
 ## Rule Sources
 
 The manual rule source is supplied locally to bootstrap and is not pinned to a
@@ -62,8 +67,7 @@ cron path in the active stack.
 Current high-level routing:
 
 - `manual-d` stays direct.
-- `voidboost.*` stays direct because its CDN is reachable on the WAN path but
-  stalls during the TLS handshake through the current TrustTunnel exit.
+- `voidboost.*` uses `voidboost-egress`: `tt-t` preferred, `direct` fallback.
 - `ads-all` is blocked.
 - `manual-t-priority`, `manual-google-ai`, `manual-t`, `manual-t-late`, and the
   T-side ready-made lists go to `tt-t`.
@@ -84,11 +88,13 @@ init.d/trusttunnel-client
 init.d/router-clock-bootstrap
 init.d/tailscale
 init.d/tailscale-underlay-watchdog
+init.d/voidboost-egress-watchdog
 bin/arm-router-rollback.sh
 bin/confirm-router-cutover.sh
 bin/rollback-to-legacy-xray.sh
 bin/refresh-sing-box-rules.sh
 bin/tailscale-underlay-watchdog.sh
+bin/voidboost-egress-watchdog.sh
 package/sing-box-router-bin/Makefile
 tools/build-sing-box-router-bin.sh
 ```
@@ -103,9 +109,11 @@ On the router these become:
 /etc/init.d/router-clock-bootstrap
 /etc/init.d/tailscale
 /etc/init.d/tailscale-underlay-watchdog
+/etc/init.d/voidboost-egress-watchdog
 /root/bin/rollback-to-legacy-xray.sh
 /root/bin/refresh-sing-box-rules.sh
 /root/bin/tailscale-underlay-watchdog.sh
+/root/bin/voidboost-egress-watchdog.sh
 ```
 
 ## Bootstrap
@@ -247,6 +255,7 @@ The active services must be enabled in OpenWrt init:
 /etc/init.d/sing-box-router enabled
 /etc/init.d/router-clock-bootstrap enabled
 /etc/init.d/tailscale-underlay-watchdog enabled
+/etc/init.d/voidboost-egress-watchdog enabled
 /etc/init.d/tailscale enabled
 ```
 
@@ -301,10 +310,12 @@ On the router:
 /etc/init.d/sing-box-router status
 /etc/init.d/router-clock-bootstrap enabled
 /etc/init.d/tailscale-underlay-watchdog status
+/etc/init.d/voidboost-egress-watchdog status
 /etc/init.d/tailscale status
 cat /tmp/router-clock-bootstrap.ok
 ss -lntp | grep -E ':(11080|10809|10810|9090|1053)'
 curl -fsS http://127.0.0.1:9090/proxies/tailscale-underlay
+curl -fsS http://127.0.0.1:9090/proxies/voidboost-egress
 tailscale status
 ip link show sb-tun0
 uci show firewall.singbox_tun

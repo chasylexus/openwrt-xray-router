@@ -6,6 +6,11 @@ exec >>"$LOG" 2>&1
 
 echo "[$(date -Iseconds)] rollback start"
 
+if [ -x /etc/init.d/voidboost-egress-watchdog ]; then
+    /etc/init.d/voidboost-egress-watchdog stop || true
+    /etc/init.d/voidboost-egress-watchdog disable || true
+fi
+
 latest_backup() {
     ls -1dt /root/router-stack-backups/* 2>/dev/null | head -n 1
 }
