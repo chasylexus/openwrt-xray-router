@@ -76,6 +76,12 @@ Current high-level routing:
 
 Apple TV+ is not included in the A-side video group.
 
+Kinopub's `proxykp.xyz` mirror and `sgupd.com`, including their subdomains,
+use `tt-t`. Before routing `proxykp.xyz`, sing-box resolves domain destinations
+to IPv4 through `dns-direct`: the mirror's IPv4 endpoints respond through
+TrustTunnel, while SOCKS requests carrying its hostname can time out. These
+explicit routes also cover the interval before the shared manual rules refresh.
+
 ## Active Files
 
 ```text

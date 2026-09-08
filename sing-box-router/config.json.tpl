@@ -517,6 +517,21 @@
       },
       {
         "domain_suffix": [
+          "proxykp.xyz"
+        ],
+        "action": "resolve",
+        "server": "dns-direct",
+        "strategy": "ipv4_only"
+      },
+      {
+        "domain_suffix": [
+          "proxykp.xyz",
+          "sgupd.com"
+        ],
+        "outbound": "tt-t"
+      },
+      {
+        "domain_suffix": [
           "dub.sh",
           "dub.co",
           "microiptv.org"
