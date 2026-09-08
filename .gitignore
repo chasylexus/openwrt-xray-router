@@ -6,6 +6,7 @@ router-client.toml
 config.json.local
 *.local.toml
 *.local.json
+/router-operations.local.md
 
 # editor junk
 *.swp
