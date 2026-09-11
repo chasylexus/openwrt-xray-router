@@ -338,6 +338,8 @@
           "domain:stability.ai",
           "domain:suno.ai",
           "domain:suno.com",
+          "domain:spook.boo",
+          "domain:etrecheck.com",
           "domain:langchain.com",
           "domain:pinecone.io",
           "domain:weaviate.io",

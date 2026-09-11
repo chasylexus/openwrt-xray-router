@@ -27,6 +27,10 @@ googleusercontent.com
 ggpht.com
 gstatic.com
 
+# --- Manual T domains ---
+spook.boo
+etrecheck.com
+
 # --- Suno AI music ---
 suno.ai
 suno.com
