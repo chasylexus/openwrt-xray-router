@@ -526,6 +526,8 @@
       {
         "domain_suffix": [
           "proxykp.xyz",
+          "1abab.ru",
+          "api.boramoraboom.ru",
           "sgupd.com"
         ],
         "outbound": "tt-t"
