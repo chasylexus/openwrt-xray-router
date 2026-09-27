@@ -107,7 +107,8 @@
           "disney",
           "hbo",
           "espn",
-          "primevideo"
+          "primevideo",
+          "cbs"
         ],
         "server": "fakeip"
       }
@@ -301,6 +302,14 @@
         "tag": "primevideo",
         "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-primevideo.srs",
+        "update_interval": "2h",
+        "download_detour": "tt-t"
+      },
+      {
+        "type": "remote",
+        "tag": "cbs",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cbs.srs",
         "update_interval": "2h",
         "download_detour": "tt-t"
       },
@@ -627,7 +636,8 @@
           "disney",
           "hbo",
           "espn",
-          "primevideo"
+          "primevideo",
+          "cbs"
         ],
         "outbound": "tt-a"
       }
