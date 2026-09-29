@@ -600,6 +600,12 @@
         "outbound": "block"
       },
       {
+        "domain_suffix": [
+          "amazon.com.tr"
+        ],
+        "outbound": "tt-a"
+      },
+      {
         "rule_set": [
           "manual-t-priority",
           "manual-google-ai",

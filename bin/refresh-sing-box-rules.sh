@@ -98,6 +98,29 @@ stop_refresh_process() {
     rm -f "${REFRESH_CHILD_PID_FILE:-}"
 }
 
+stop_managed_stack() {
+    # Keep the exact PID across retries: procd may forget it before it exits.
+    if [ -z "${MANAGED_STOP_PID:-}" ]; then
+        managed_info="$(ubus call service list '{"name":"sing-box-router"}' 2>/dev/null)" || return 1
+        printf '%s\n' "$managed_info" | jsonfilter -e '@' >/dev/null 2>&1 || return 1
+        MANAGED_STOP_PID="$(printf '%s\n' "$managed_info" |
+            jsonfilter -e '@["sing-box-router"].instances.*.pid' 2>/dev/null || true)"
+    fi
+    case "$MANAGED_STOP_PID" in
+        '') ;;
+        *[!0-9]*|0|1) return 1 ;;
+    esac
+    # The exact PID's exit, not the stop command's status, proves shutdown.
+    "$SB_INIT" stop >/dev/null 2>&1 || true
+    managed_wait=0
+    while [ -n "$MANAGED_STOP_PID" ] && kill -0 "$MANAGED_STOP_PID" 2>/dev/null; do
+        [ "$managed_wait" -lt 45 ] || return 1
+        sleep 1
+        managed_wait=$((managed_wait + 1))
+    done
+    MANAGED_STOP_PID=""
+}
+
 run_bounded_refresh() {
     hard_timeout=$((RULE_REFRESH_TIMEOUT + 15))
     child_pid=""
@@ -131,7 +154,11 @@ emergency_cleanup() {
     if [ "${MAINTENANCE_ACTIVE:-0}" = "1" ]; then
         set +e
         stop_refresh_process
-        "$SB_INIT" stop >/dev/null 2>&1
+        if ! stop_managed_stack; then
+            log "managed sing-box did not stop; cache and staged service left untouched"
+            rmdir "$LOCK_DIR" 2>/dev/null || true
+            exit 1
+        fi
 
         if [ "${REFRESH_COMMITTED:-0}" != "1" ] &&
             [ "${CACHE_SNAPSHOT_READY:-0}" = "1" ] &&
@@ -203,6 +230,16 @@ mkdir -p "$STAGE_ROOT"
 cp "$SB_CONFIG" "$NORMAL_CONFIG"
 chmod 600 "$NORMAL_CONFIG"
 extract_remote_rule_tags "$NORMAL_CONFIG" > "$RULE_TAGS"
+if [ "$#" -gt 0 ]; then
+    for tag do
+        case "$tag" in
+            ''|*[!A-Za-z0-9._-]*) die "invalid remote rule-set tag" ;;
+        esac
+        grep -Fxq -e "$tag" "$RULE_TAGS" ||
+            die "unknown remote rule-set tag: $tag"
+    done
+    printf '%s\n' "$@" | sort -u > "$RULE_TAGS"
+fi
 EXPECTED_RULES="$(wc -l < "$RULE_TAGS" | tr -d ' ')"
 [ "$EXPECTED_RULES" -gt 0 ] ||
     die "no remote rule-set tags found in $SB_CONFIG"
@@ -219,7 +256,7 @@ log "staging complete: $EXPECTED_RULES remote rule-sets, backup $BACKUP_DIR"
 log "stopping managed sing-box for a consistent cache snapshot; dnsmasq stays up"
 log "remote rule-sets will refresh sequentially to avoid a parallel TLS storm"
 MAINTENANCE_ACTIVE=1
-"$SB_INIT" stop >/dev/null 2>&1 || true
+stop_managed_stack || rollback_refresh "managed sing-box did not stop"
 
 if [ -f "$SB_CACHE" ]; then
     cp -a "$SB_CACHE" "$CACHE_BACKUP"

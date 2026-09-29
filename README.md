@@ -360,3 +360,21 @@ For a manual rollback, restore the previous files from
 `/root/router-stack-backups/<timestamp>/`, restart `dnsmasq` and `firewall`,
 stop `sing-box-router`, and re-enable the legacy service if that router still
 uses it.
+
+## Refresh one routing resource
+
+After publishing and validating an update to the shared Throne manual-a list
+and applying the current router template (including the Amazon Turkey override):
+
+```sh
+/root/bin/refresh-sing-box-rules.sh manual-a
+```
+
+Without arguments the script refreshes all remote rule-sets. Named tags must
+exist in the active configuration; invalid selections fail before services
+stop. Use the activity, backup and verification procedure in
+[router operations](docs/router-operations.md). This is a maintenance refresh:
+sing-box is briefly replaced by the refresh instance and dnsmasq restarts at
+the end. The script preserves the fake-IP cache and keeps a rollback copy.
+The shared manual-a list includes Amazon consumer domains and streaming CDN
+additions; generic AWS/CloudFront are excluded from the new A coverage.
