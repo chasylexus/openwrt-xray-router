@@ -15,12 +15,14 @@
   ],
   "allowed_semantic_change": "outbounds[tag=T].outbounds order only",
   "transform_sha256": "f28046a62bc0322cb2ccf9a78f72e94cacaf81ad2c074b6e3e73f6179d09c006",
-  "activation": "native RouterService.PutConfig and ConfirmConfig; 60-second automatic rollback",
+  "activation": "SSH with the native exclusive switch lock, stop and wait, then same-filesystem atomic config rename and start; verified health or automatic config-only rollback",
   "validation": [
     "exact previous priority and unique group",
     "semantic preservation outside priority",
     "installed core configuration check",
-    "native dry-run restrictions and restart classification"
+    "fresh verified off-device backup",
+    "same saved-profile and previous-config bytes before and after activation"
   ],
-  "rollback": "native unconfirmed transaction rollback; after confirmation, apply the saved original through a new native transaction"
+  "rollback": "Restore the verified original config bytes while holding the same lock; never restore or rewrite saved profiles, cache or Tailscale state",
+  "saved_profiles": "Kept byte-identical. The running config is external; selecting a saved profile restores that profile configuration and priority."
 }
