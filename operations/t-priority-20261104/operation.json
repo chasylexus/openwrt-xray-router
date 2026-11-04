@@ -1,0 +1,26 @@
+{
+  "operation": "T outbound priority",
+  "schema": 1,
+  "group": "T",
+  "expected_type": "fallback",
+  "before": [
+    "TR-2",
+    "TR-1",
+    "TR-3"
+  ],
+  "after": [
+    "TR-1",
+    "TR-2",
+    "TR-3"
+  ],
+  "allowed_semantic_change": "outbounds[tag=T].outbounds order only",
+  "transform_sha256": "f28046a62bc0322cb2ccf9a78f72e94cacaf81ad2c074b6e3e73f6179d09c006",
+  "activation": "native RouterService.PutConfig and ConfirmConfig; 60-second automatic rollback",
+  "validation": [
+    "exact previous priority and unique group",
+    "semantic preservation outside priority",
+    "installed core configuration check",
+    "native dry-run restrictions and restart classification"
+  ],
+  "rollback": "native unconfirmed transaction rollback; after confirmation, apply the saved original through a new native transaction"
+}
